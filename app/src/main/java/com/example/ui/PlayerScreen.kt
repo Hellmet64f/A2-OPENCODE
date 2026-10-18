@@ -128,6 +128,51 @@ fun PlayerScreen(
         }
     }
 
+    var showDownloadEditDialog by remember { mutableStateOf(false) }
+    var capturedMediaUrl by remember { mutableStateOf<String?>(null) }
+
+    fun extractMediaUrlFromWebView() {
+        val wv = webViewRef ?: return
+        wv.evaluateJavascript(
+            """
+            (function() {
+                try {
+                    var v = document.querySelector('video');
+                    if (v && (v.currentSrc || v.src)) {
+                        return v.currentSrc || v.src;
+                    }
+                    var s = document.querySelector('source');
+                    if (s && s.src) {
+                        return s.src;
+                    }
+                    var a = document.querySelector('a[href*=".mp4"], a[download]');
+                    if (a && a.href) {
+                        return a.href;
+                    }
+                } catch(e) {}
+                return '';
+            })();
+            """.trimIndent()
+        ) { result ->
+            val clean = result?.trim('"', '\'', ' ', '\n', '\r')
+            if (!clean.isNullOrBlank() && clean != "null") {
+                capturedMediaUrl = clean
+            }
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        com.example.MainActivity.onOpenDownloadEditCallback = {
+            extractMediaUrlFromWebView()
+            showDownloadEditDialog = true
+        }
+    }
+    DisposableEffect(Unit) {
+        onDispose {
+            com.example.MainActivity.onOpenDownloadEditCallback = null
+        }
+    }
+
     var nextEpisodeUrl by remember { mutableStateOf<String?>(null) }
     var prevEpisodeUrl by remember { mutableStateOf<String?>(null) }
 
@@ -529,7 +574,9 @@ fun PlayerScreen(
     }
 
     BackHandler(enabled = true) {
-        if (showZoomSheet) {
+        if (showDownloadEditDialog) {
+            showDownloadEditDialog = false
+        } else if (showZoomSheet) {
             showZoomSheet = false
         } else if (isCalibrationOpen) {
             isCalibrationOpen = false
@@ -1029,6 +1076,17 @@ fun PlayerScreen(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
+                            // Baixar & Editar Button (PC e TV)
+                            TvControlPill(
+                                icon = Icons.Default.Download,
+                                label = "📥 Baixar / Editar",
+                                color = Color(0xFF2E7D32),
+                                onClick = {
+                                    extractMediaUrlFromWebView()
+                                    showDownloadEditDialog = true
+                                }
+                            )
+
                             // Zoom da Tela Button
                             TvControlPill(
                                 icon = Icons.Default.ZoomIn,
@@ -1108,10 +1166,21 @@ fun PlayerScreen(
                         onClick = { forcePlayVideo() }
                     )
 
+                    // Baixar / Editar Button
+                    TvControlPill(
+                        icon = Icons.Default.Download,
+                        label = "📥 Baixar",
+                        color = Color(0xFF2E7D32),
+                        onClick = {
+                            extractMediaUrlFromWebView()
+                            showDownloadEditDialog = true
+                        }
+                    )
+
                     // Zoom da Tela Button
                     TvControlPill(
                         icon = Icons.Default.ZoomIn,
-                        label = "🔍 Zoom da Tela",
+                        label = "🔍 Zoom",
                         color = Color(0xFF0077B6),
                         onClick = { showZoomSheet = true }
                     )
@@ -1744,6 +1813,31 @@ fun PlayerScreen(
                     )
                 }
             }
+        }
+
+        if (showDownloadEditDialog) {
+            DownloadAndEditDialog(
+                initialTitle = playingState.title,
+                episodeNumber = currentEpisode?.number?.toString(),
+                currentMediaUrl = capturedMediaUrl ?: currentUrl,
+                currentZoomPreset = zoomPreset,
+                onApplyZoomPreset = { preset ->
+                    val next = ScreenZoomManager.applyPreset(context, preset)
+                    zoomScale = next.scale
+                    panX = next.panX
+                    panY = next.panY
+                    zoomPreset = next.preset
+                },
+                onOpenFocusCalibration = {
+                    isCalibrationOpen = true
+                },
+                onTriggerForcePlay = {
+                    forcePlayVideo()
+                },
+                onDismissRequest = {
+                    showDownloadEditDialog = false
+                }
+            )
         }
     }
 }

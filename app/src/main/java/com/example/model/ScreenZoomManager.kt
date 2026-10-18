@@ -68,4 +68,23 @@ object ScreenZoomManager {
         saveZoomConfig(context, next.scale, next.panX, next.panY, next.preset)
         return next
     }
+
+    val ALL_PRESETS = listOf(
+        PRESET_NORMAL to "Normal (100%)",
+        PRESET_FIT to "Ajustar (115%)",
+        PRESET_CINEMA to "Cinema (130%)",
+        PRESET_FULL to "Tela Cheia (150%)"
+    )
+
+    fun applyPreset(context: Context, preset: String): ZoomConfig {
+        val next = when (preset) {
+            PRESET_NORMAL -> ZoomConfig(1.00f, 0f, 0f, PRESET_NORMAL)
+            PRESET_FIT -> ZoomConfig(1.15f, 0f, 0f, PRESET_FIT)
+            PRESET_CINEMA -> ZoomConfig(1.30f, 0f, 0f, PRESET_CINEMA)
+            PRESET_FULL -> ZoomConfig(1.50f, 0f, 0f, PRESET_FULL)
+            else -> ZoomConfig(1.00f, 0f, 0f, PRESET_NORMAL)
+        }
+        saveZoomConfig(context, next.scale, next.panX, next.panY, next.preset)
+        return next
+    }
 }

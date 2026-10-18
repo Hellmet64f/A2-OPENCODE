@@ -12,7 +12,7 @@ permissions:
 
 jobs:
   build:
-    name: Build Android APK & Release
+    name: Build Android APK & Windows PC Release
     runs-on: ubuntu-latest
 
     steps:
@@ -39,37 +39,49 @@ jobs:
             gradle assembleDebug --stacktrace
           fi
 
-      - name: Prepare APK Artifact
+      - name: Prepare Release Artifacts (APK & PC Package)
         run: |
           mkdir -p release-output
           cp app/build/outputs/apk/debug/*.apk release-output/A2-Miguel-TV.apk || cp $(find app/build/outputs/apk/ -name "*.apk" | head -n 1) release-output/A2-Miguel-TV.apk
 
-      - name: Upload APK Artifact
+          # Package Windows PC Executable Launchers
+          mkdir -p pc-package
+          cp Abrir-no-PC.bat pc-package/
+          cp Instalar-Atalho-PC.bat pc-package/
+          cp README.md pc-package/
+          cd pc-package && zip -r ../release-output/A2-Miguel-PC-Windows.zip * && cd ..
+
+      - name: Upload Release Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: A2-Miguel-APK
-          path: release-output/*.apk
+          name: A2-Miguel-Release-Files
+          path: release-output/*
 
       - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_type == 'tag' && github.ref_name || 'v1.0.0' }}
-          name: "A2 Miguel - Versão Oficial (${{ github.ref_type == 'tag' && github.ref_name || 'v1.0.0' }})"
+          name: "A2 Miguel - Versão Oficial TV & PC (${{ github.ref_type == 'tag' && github.ref_name || 'v1.0.0' }})"
           body: |
-            ### 🎬 A2 Miguel - Aplicativo de Filmes, Séries e Animes
+            ### 🎬 A2 Miguel - Aplicativo Oficial de Filmes, Séries e Animes
 
-            **Recursos inclusos:**
-            - 🔍 **Controle de Zoom e Enquadramento da Tela**: Modos Normal (100%), Ajustar (115%), Cinema (130%) e Tela Cheia (150%) para eliminar barras pretas na TV.
-            - 🎮 **Atalho no Controle Remoto**: Tecla Amarela / Zoom alterna os modos de zoom rapidamente com indicador na tela.
-            - ⏭️ **Troca de Episódios**: Volume `+` avança para o próximo episódio e Volume `-` volta ao anterior.
-            - ⏩ **Controle de Reprodução**: Setas Esquerda/Direita avançam e retrocedem 10 segundos.
-            - 🛡️ **Autoplay Dublado & No Ads**: Reprodução automática em português sem propagandas intrusivas.
-            - 💻 **Modo PC**: Execute o arquivo `Abrir-no-PC.bat` para rodar como aplicativo de desktop no Windows!
+            **Arquivos disponíveis para download nesta Release:**
+            1. 📱 **`A2-Miguel-TV.apk`**: Instalador completo para Smart TV, TV Box Android (Aquário, Mi Box, Fire TV) e celulares.
+            2. 💻 **`A2-Miguel-PC-Windows.zip`**: Pacote de inicialização em janela nativa dedicada para Computador (Windows), incluindo atalho com 1 clique para a Área de Trabalho.
 
-            **Como usar na TV Box:**
-            1. Baixe o arquivo `A2-Miguel-TV.apk` abaixo.
-            2. Transfira para um pendrive ou use um gerenciador de arquivos na sua TV Box para instalar.
-          files: release-output/*.apk
+            ---
+
+            ### 🚀 Novos Recursos Inclusos:
+            - 📥 **Janela Dedicada de Download & Edição (PC e TV)**:
+              - Escolha a pasta de salvamento (`Downloads`, `Filmes`, `Séries`).
+              - Selecione a qualidade do vídeo (`1080p Full HD`, `720p HD`, `480p Rápido` ou `Original`).
+              - Edite o nome do arquivo antes de baixar.
+              - Atalho rápido no teclado: pressione a tecla **`D`** no PC para abrir a janela!
+            - 🔍 **Controle de Zoom da Tela & Enquadramento**: Modos Normal (100%), Ajustar (115%), Cinema (130%) e Tela Cheia (150%) para eliminar barras pretas.
+            - 🎯 **Calibração de Foco Automático**: Mira com controle remoto para salvar a posição do Play em todos os vídeos.
+            - 🎮 **Atalhos no Controle**: Volume `+`/`-` troca episódios; setas avançam/retrocedem 10s.
+            - 🛡️ **Autoplay Dublado & Sem Anúncios**.
+          files: release-output/*
           draft: false
           prerelease: false

@@ -149,6 +149,7 @@ class MainActivity : ComponentActivity() {
         var onTestCalibrationClick: (() -> Unit)? = null
         var onSaveCalibration: (() -> Unit)? = null
         var onExitCalibration: (() -> Unit)? = null
+        var onOpenDownloadEditCallback: (() -> Unit)? = null
     }
 
     private var seekJob: kotlinx.coroutines.Job? = null
@@ -326,6 +327,13 @@ class MainActivity : ComponentActivity() {
                     KeyEvent.KEYCODE_ZOOM_IN,
                     KeyEvent.KEYCODE_ZOOM_OUT -> {
                         val cb = onToggleZoomCallback
+                        if (cb != null) {
+                            cb.invoke()
+                            return true
+                        }
+                    }
+                    KeyEvent.KEYCODE_D -> {
+                        val cb = onOpenDownloadEditCallback
                         if (cb != null) {
                             cb.invoke()
                             return true

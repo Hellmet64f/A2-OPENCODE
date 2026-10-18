@@ -1,11 +1,13 @@
 @echo off
-title A2 Miguel - Filmes e Series
+title A2 Miguel - Filmes e Series no PC
 color 0C
 echo ========================================================
-echo        A2 MIGUEL - INICIANDO APLICATIVO NO PC
+echo        A2 MIGUEL - APLICATIVO NATIVO PARA PC
 echo ========================================================
 echo.
-echo Abrindo em modo aplicativo nativo no seu Windows...
+echo Abrindo em modo janela dedicada de aplicativo no Windows...
+echo [Dica] Pressione a tecla D dentro do reprodutor para abrir a
+echo janela de download, selecao de pasta, qualidade e nome!
 echo.
 
 set APP_URL=https://ais-pre-6r5myv5rfy2ejl7ibgbd7v-719019642347.us-west2.run.app

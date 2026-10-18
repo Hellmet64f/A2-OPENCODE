@@ -4,12 +4,21 @@ color 0C
 
 set TARGET_DIR=%USERPROFILE%\Downloads\A2-Miguel-PC
 
-:: Se ainda não foi instalado na pasta Downloads, executa o instalador completo
-if not exist "%TARGET_DIR%\index.html" (
-    if exist "%~dp0Instalar-e-Rodar-no-PC.bat" (
-        call "%~dp0Instalar-e-Rodar-no-PC.bat"
-        exit
-    )
+:: Cria pastas se não existirem
+if not exist "%TARGET_DIR%" mkdir "%TARGET_DIR%"
+if not exist "%TARGET_DIR%\Videos" mkdir "%TARGET_DIR%\Videos"
+if not exist "%TARGET_DIR%\Filmes" mkdir "%TARGET_DIR%\Filmes"
+if not exist "%TARGET_DIR%\Series" mkdir "%TARGET_DIR%\Series"
+
+:: Atualiza automaticamente os arquivos mais recentes com multi-servidor e catálogo completo
+if exist "%~dp0app-pc" (
+    copy /Y "%~dp0app-pc\index.html" "%TARGET_DIR%\" >nul 2>&1
+    copy /Y "%~dp0app-pc\style.css" "%TARGET_DIR%\" >nul 2>&1
+    copy /Y "%~dp0app-pc\app.js" "%TARGET_DIR%\" >nul 2>&1
+) else if exist "%~dp0index.html" (
+    copy /Y "%~dp0index.html" "%TARGET_DIR%\" >nul 2>&1
+    copy /Y "%~dp0style.css" "%TARGET_DIR%\" >nul 2>&1
+    copy /Y "%~dp0app.js" "%TARGET_DIR%\" >nul 2>&1
 )
 
 echo ========================================================
@@ -19,6 +28,7 @@ echo.
 echo Abrindo em modo janela dedicada de aplicativo no Windows...
 echo [Dica] Pressione a tecla D dentro do reprodutor para abrir a
 echo janela de download, selecao de pasta, qualidade e nome!
+echo [Dica] Use os botoes de Servidor 1, 2 e 3 caso queira alternar a transmissao!
 echo.
 
 set LOCAL_APP=file:///%TARGET_DIR:\=/%/index.html

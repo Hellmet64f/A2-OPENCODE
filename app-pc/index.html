@@ -35,6 +35,7 @@
     <!-- Barra de Categorias -->
     <nav class="categories-bar">
         <div class="chip active" data-type="all">🔥 Todos os Destaques</div>
+        <div class="chip" data-type="2024">✨ Lançamentos 2024</div>
         <div class="chip" data-type="movie">🎬 Filmes</div>
         <div class="chip" data-type="series">📺 Séries</div>
         <div class="chip" data-type="anime">⛩️ Animes</div>
@@ -55,7 +56,7 @@
     <!-- Catálogo de Títulos -->
     <main class="content-section">
         <div class="section-title">
-            <span>🎬</span> Catálogo Disponível
+            <span>🎬</span> Catálogo Disponível (<span id="totalTitlesCount">Carregando...</span>)
         </div>
         <div class="media-grid" id="mediaGrid">
             <!-- Cards gerados via app.js -->
@@ -69,6 +70,14 @@
                 <h2 id="playerTitle">Reproduzindo Vídeo</h2>
                 <span id="playerMeta">A2 Miguel Cinema</span>
             </div>
+
+            <div class="server-selector-bar" id="serverSelectorBar">
+                <span class="server-label">Servidor:</span>
+                <button class="server-btn active" data-server="1" id="btnServer1">★ Servidor 1 (Dublado)</button>
+                <button class="server-btn" data-server="2" id="btnServer2">🚀 Servidor 2 (HD)</button>
+                <button class="server-btn" data-server="3" id="btnServer3">🛡️ Servidor 3 (Reserva)</button>
+            </div>
+
             <div class="player-controls-row">
                 <button class="btn-pill" id="btnPlayerZoom" title="Alternar Zoom da Tela (Tecla Z)">
                     <span>🔍</span> Zoom Tela

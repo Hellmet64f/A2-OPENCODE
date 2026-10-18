@@ -1,6 +1,6 @@
-# A2 Miguel para PC: Instalador .bat Autônomo com Pasta em Downloads e App Completo Offline
+# Correção do Player Multi-Servidor (Sem Erro ParkLogic) e Catálogo Completo com Busca em Tempo Real no PC
 
-Sistema completo com script `.bat` autônomo que instala e configura o A2 Miguel diretamente no computador do usuário (criando a pasta dedicada em `Downloads`), executando a aplicação desktop completa com a mesma interface, reprodutor sem anúncios, controle de zoom, janela de download e catálogo da versão móvel, funcionando 100% no Windows sem depender de servidores em nuvem temporários.
+Plano de correção e aprimoramento completo para solucionar o erro de domínio estacionado (ParkLogic), substituir a fonte de vídeo por um sistema robusto de múltiplos servidores com áudio dublado e sem anúncios (com seletor rápido no topo do player), e expandir o catálogo para exibir todos os filmes, séries e animes com busca instantânea em tempo real e filtros de categorias.
 
 ---
 
@@ -8,143 +8,121 @@ Sistema completo com script `.bat` autônomo que instala e configura o A2 Miguel
 
 > [!IMPORTANT]
 > **Decisões Confirmadas pelo Usuário nas Perguntas de Alinhamento**:
-> - **Problema Identificado**: O link antigo no `.bat` apontava para uma URL temporária do container de desenvolvimento (`ais-pre-...`), gerando "Erro de conexão ou servidor fora do ar" ao ser aberto fora da sessão da nuvem.
-> - **Funcionamento do .bat**: O `.bat` irá rodar de forma 100% autônoma, instalar todos os componentes necessários na máquina do usuário e criar a pasta dedicada do aplicativo dentro da pasta **`Downloads`** (`%USERPROFILE%\Downloads\A2-Miguel-PC`).
-> - **Experiência no Computador**: A interface e funcionamento no PC serão **idênticos à versão de celular e TV**, trazendo:
->   - Catálogo de filmes, séries e animes com pesquisa integrada.
->   - Reprodutor cinematográfico com reprodução automática dublada e sem anúncios.
->   - Janela de download dedicada para salvar arquivos `.mp4` nas resoluções 1080p, 720p e 480p com edição de nome e seleção de pastas.
->   - Modos de zoom da tela (Normal, Ajustar, Cinema, Tela Cheia) para eliminar barras pretas no monitor.
+> - **Causa do Erro Identificada**: O link anterior utilizava o domínio `superflixapi.top`, que foi estacionado na ParkLogic.
+> - **Solução de Reprodução Escolhida**: **Múltiplos servidores com áudio dublado e sem anúncios**, incluindo uma barra de seleção rápida de servidores (Servidor 1 Dublado, Servidor 2 HD, Servidor 3 Alternativo, AniChan) dentro do próprio player para que o usuário nunca fique sem assistir caso uma fonte oscile.
+> - **Exibição do Catálogo Escolhida**: **Catálogo completo expandido com busca em tempo real e categorias**, trazendo um acervo rico com dezenas de títulos em alta, lançamentos e animes, além de mecanismo de busca dinâmico por texto para encontrar qualquer filme ou série.
 
 ---
 
 ## 1. Overview & Core Concept
 
 - **O que faz**:
-  1. Fornece o arquivo `Instalar-e-Rodar-no-PC.bat` (e atualiza o `Abrir-no-PC.bat`) que, ao ser executado no Windows com 2 cliques, cria automaticamente a pasta `%USERPROFILE%\Downloads\A2-Miguel-PC`.
-  2. Instala e inicia o aplicativo desktop nativo do A2 Miguel (construído em HTML5/CSS3/JS modular autônomo com visual Dark Red idêntico ao Android Compose).
-  3. Abre em modo de **Janela Dedicada do Windows** (`--app` no Edge ou Chrome), sem abas e sem barra de navegação, com proporção 16:9 ajustada (1280x720) exatamente como um programa `.exe` profissional.
-  4. Cria um atalho oficial na Área de Trabalho (Desktop) para que o usuário possa abrir o app a qualquer momento sem precisar do terminal.
-  5. Integra o reprodutor de vídeo, sistema de busca e a janela de download com salvamento direto na pasta `Downloads\A2-Miguel-PC\Videos`.
-- **Público-alvo**: Usuários no Windows que querem assistir a filmes, séries e animes com a mesma facilidade da Smart TV e baixar conteúdos localmente sem erros de servidor.
-- **Benefício principal**: Independência total de servidores temporários da nuvem: o programa roda localmente no Windows com alta velocidade e estabilidade.
+  1. Remove completamente o provedor antigo com erro ParkLogic e introduz um ecossistema multi-provedor (WarezCDN, EmbedMovies, SuperFlix API ativa, AniChan e streams diretos) que garantem carregamento imediato em português (Dublado).
+  2. Adiciona seletor de servidores no topo do reprodutor (`[🎬 Servidor 1 Dublado] [🚀 Servidor 2 HD] [🛡️ Servidor 3 Reserva]`), permitindo alternância instantânea com 1 clique caso um vídeo falhe.
+  3. Expande massivamente a base de títulos para cobrir lançamentos de 2024, clássicos, séries em alta e animes populares, organizados em categorias (`Todos`, `Filmes`, `Séries`, `Animes`, `Lançamentos`).
+  4. Implementa busca instantânea com filtro em tempo real à medida que o usuário digita na barra de pesquisa.
+  5. Mantém a janela de download dedicada (`D`), controle de zoom de tela (`Z`) e o instalador automático da pasta `Downloads\A2-Miguel-PC`.
+- **Público-alvo**: Usuários no computador que desejam assistir a filmes e séries com alta estabilidade e sem telas de erro.
+- **Benefício principal**: Certeza de reprodução contínua graças ao fallback inteligente entre servidores, sem anúncios invasivos e com catálogo abrangente.
 
 ---
 
 ## 2. User Experience & Visual Design
 
-### Fluxo de Execução no Computador (Windows)
+### Nova Interface do Player com Seletor de Servidores
 
 ```
 ┌────────────────────────────────────────────────────────────────────────┐
-│                        ÁREA DE TRABALHO / DOWNLOADS                    │
+│ 🎬 A2 Miguel - Player Cinema no PC                                [X] │
+├────────────────────────────────────────────────────────────────────────┤
+│ 🏷️ Deadpool & Wolverine (2024)                                        │
+│ Servidores: [★ Servidor 1 Dublado] [Servidor 2 HD] [Servidor 3 Reserva]│
+├────────────────────────────────────────────────────────────────────────┤
 │                                                                        │
-│  [2 Cliques em "Instalar-e-Rodar-no-PC.bat"]                           │
-│                     │                                                  │
-│                     ▼                                                  │
-│  ┌──────────────────────────────────────────────────────────────────┐  │
-│  │ Prompt do Windows (Instalação Automática):                       │  │
-│  │ 1. Cria pasta: C:\Users\Nome\Downloads\A2-Miguel-PC              │  │
-│  │ 2. Cria subpastas: Videos, Filmes, Series                        │  │
-│  │ 3. Instala arquivos do aplicativo desktop autônomo               │  │
-│  │ 4. Cria atalho "A2 Miguel" na Área de Trabalho                   │  │
-│  │ 5. Abre janela dedicada do Windows imediatamente!                │  │
-│  └──────────────────────────────────┬───────────────────────────────┘  │
-│                                     │                                  │
-│                                     ▼                                  │
-│  ┌──────────────────────────────────────────────────────────────────┐  │
-│  │ JANELA NATIVA DEDICADA DO WINDOWS (1280x720)                     │  │
-│  │ 🎬 A2 Miguel - Filmes, Séries e Animes                       [X] │  │
-│  ├──────────────────────────────────────────────────────────────────┤  │
-│  │ [🔍 Buscar Filme...] [Todos] [Filmes] [Séries] [Animes]          │  │
-│  │                                                                  │  │
-│  │ ┌───────────────┐ ┌───────────────┐ ┌───────────────┐            │  │
-│  │ │ Poster Filme  │ │ Poster Série  │ │ Poster Anime  │            │  │
-│  │ │ Assistir / ⬇️  │ │ Assistir / ⬇️  │ │ Assistir / ⬇️  │            │  │
-│  │ └───────────────┘ └───────────────┘ └───────────────┘            │  │
-│  │                                                                  │  │
-│  │ [Ao clicar em um título: Abre Reprodutor Cinema + Janela Down]   │  │
-│  └──────────────────────────────────────────────────────────────────┘  │
+│                                                                        │
+│                 ┌──────────────────────────────────┐                   │
+│                 │                                  │                   │
+│                 │        VÍDEO CARREGANDO          │                   │
+│                 │      100% DUBLADO E SEM ADS      │                   │
+│                 │                                  │                   │
+│                 └──────────────────────────────────┘                   │
+│                                                                        │
+│                                                                        │
+├────────────────────────────────────────────────────────────────────────┤
+│ [🔍 Zoom: Normal 100%]    [📥 Baixar Vídeo (D)]    [✕ Fechar Reprodutor]│
 └────────────────────────────────────────────────────────────────────────┘
 ```
 
-### Janela do Player e Central de Download no PC
-- **Design Visual**: Dark Mode cinematográfico (`#0E0F14` e `#E50914`), inspirado na versão Android Compose, com cabeçalho de controle, barra de status e botões de ação com feedback ao passar o mouse (hover) e clique.
-- **Janela de Download Dedicada (Tecla `D` ou Botão `📥 Baixar`)**:
-  - Edição do nome do arquivo (ex: `A2_Miguel_MeuFilme_1080p.mp4`).
-  - Escolha de qualidade (1080p, 720p, 480p, Original).
-  - Seleção da pasta de destino (`Downloads\A2-Miguel-PC\Videos`).
-  - Botão de download direto que salva o arquivo no disco do computador.
+### Catálogo Completo com Categorias e Busca
+- **Barra de Busca Inteligente**: Responde a cada caractere digitado, filtrando títulos por nome, gênero, ano ou sinopse.
+- **Categorias Dinâmicas**: Chips clicáveis para filtrar rapidamente entre:
+  - `🔥 Todos`
+  - `🎬 Filmes`
+  - `📺 Séries`
+  - `⛩️ Animes`
+  - `✨ Lançamentos 2024`
+- **Cards com Dados Ricos**: Pôsteres em alta definição com badge de nota IMDb e indicação de áudio Dublado.
 
 ---
 
 ## 3. Key Product Decisions & Trade-Offs
 
-- **Decisão 1: Aplicação Desktop Autônoma Local vs. Dependência da Nuvem**:
-  - *Abordagem Escolhida*: Empacotar uma aplicação desktop autônoma completa (HTML5/CSS3/JS modular) que é instalada pelo `.bat` diretamente no computador do usuário.
-  - *Por que*: Elimina completamente o erro "servidor fora do ar", pois a aplicação roda localmente e consome os fluxos de streaming diretamente das fontes (Pobreflix/AniChan), garantindo que sempre abra mesmo sem o AI Studio ativo.
-  - *Alternativa Considerada*: Continuar usando apenas a URL do Cloud Run. Rejeitada porque a URL expira e causa o erro relatado pelo usuário.
-
-- **Decisão 2: Instalação Automática na Pasta Downloads (`%USERPROFILE%\Downloads\A2-Miguel-PC`)**:
-  - *Abordagem Escolhida*: O script `.bat` detecta automaticamente a pasta de Downloads do usuário do Windows, cria a estrutura necessária, copia os arquivos do aplicativo e cria as pastas `Videos`, `Filmes` e `Series` para organização dos downloads.
-  - *Por que*: Atende com precisão cirúrgica ao pedido do usuário ("o .bat vai rodar tudo e instlar tudo pra rodar e pasta vai aparecer no Downloads").
-
-- **Decisão 3: Manter Compatibilidade Total com TV Box (APK) e Release no GitHub**:
-  - *Abordagem Escolhida*: O projeto continuará mantendo o APK do Android compilando 100% no Gradle para TV Box e o workflow do GitHub Actions (`release.yml`) empacotará o APK e o instalador do PC em um único pacote de Release.
-  - *Por que*: O usuário pediu que fosse "igual na versão de telefone, mas pra pc", permitindo que o mesmo repositório atenda tanto Smart TVs quanto computadores.
+- **Decisão 1: Arquitetura Multi-Servidor com Fallback Automático**:
+  - *Abordagem Escolhida*: Cada título possuirá múltiplos links de servidores confiáveis (como WarezCDN, EmbedMovies, SuperFlix API ativa e AniChan). Se o usuário encontrar lentidão no Servidor 1, um clique no botão de Servidor 2 ou 3 alterna a transmissão instantaneamente.
+  - *Por que*: Elimina totalmente o problema de domínio fora do ar ou página estacionada da ParkLogic.
+- **Decisão 2: Acervo Local Amplo e Busca em Tempo Real**:
+  - *Abordagem Escolhida*: Incluir um acervo de mais de 50 títulos famosos em todas as categorias dentro do `app.js`, com busca instantânea que responde à digitação sem travamentos.
+  - *Por que*: O usuário terá um catálogo farto disponível no seu PC imediatamente ao abrir o aplicativo, sem precisar esperar requisições lentas.
+- **Decisão 3: Atualização Automática nos Arquivos em Downloads**:
+  - *Abordagem Escolhida*: O script `Instalar-e-Rodar-no-PC.bat` e `Abrir-no-PC.bat` atualizarão os arquivos na pasta `%USERPROFILE%\Downloads\A2-Miguel-PC` na próxima execução, garantindo que o usuário receba a correção sem precisar fazer configurações manuais.
 
 ---
 
 ## 4. Technical Architecture & Data Strategy
 
-### Diagrama de Arquitetura do Pacote PC
+### Componentes e Fluxo de Dados
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────────┐
-│                            ARQUITETURA DO SISTEMA PC                         │
+│                              ARQUITETURA PC ATUALIZADA                       │
 │                                                                              │
-│  [Instalar-e-Rodar-no-PC.bat]                                                │
-│         │                                                                    │
-│         ├──▶ 1. Cria diretório: %USERPROFILE%\Downloads\A2-Miguel-PC         │
-│         ├──▶ 2. Cria subpastas: \Videos, \Filmes, \Series                    │
-│         ├──▶ 3. Descompacta/Cria: app-pc\index.html, app.js, style.css       │
-│         ├──▶ 4. Cria atalho: Desktop\A2 Miguel.lnk                           │
-│         └──▶ 5. Dispara: msedge.exe --app=file:///.../index.html             │
-│                                                                              │
-│                         ┌───────────────────────────┐                        │
-│                         │   A2 Miguel Desktop PC    │                        │
-│                         ├───────────────────────────┤                        │
-│                         │ • Catálogo de Filmes/Série│                        │
-│                         │ • Player Cinema No Ads    │                        │
-│                         │ • Zoom e Enquadramento    │                        │
-│                         │ • Janela de Download (D)  │                        │
-│                         │ • Salvamento em Downloads │                        │
-│                         └───────────────────────────┘                        │
+│  [Barra de Busca / Filtros] ───▶ Filtra catálogo completo de filmes/séries   │
+│                                           │                                  │
+│                                           ▼                                  │
+│  [Clique no Card do Filme] ────▶ Abre Player Cinema                          │
+│                                           │                                  │
+│                                           ▼                                  │
+│  ┌────────────────────────────────────────────────────────────────────────┐  │
+│  │ MultiServer Engine:                                                    │  │
+│  │ • Servidor 1: https://embed.warezcdn.net/filme/{id} (Dublado Oficial) │  │
+│  │ • Servidor 2: https://embedmovies.org/embed/movie/{id} (HD Rápido)     │  │
+│  │ • Servidor 3: Stream Alternativo / Pobreflix                           │  │
+│  │ • AniChan: https://anichan.to/anime/{id}/{ep} (Animes)                 │  │
+│  └────────────────────────────────────────────────────────────────────────┘  │
+│                                           │                                  │
+│  [Janela de Download (D)] ─────▶ Salva MP4 em Downloads\A2-Miguel-PC\Videos   │
 └──────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### Arquivos a Serem Criados e Atualizados:
-
-1. **`app-pc/index.html`**:
-   - Interface completa do aplicativo para PC: cabeçalho com busca, catálogo de filmes e séries, reprodutor embutido sem anúncios, controles de zoom e modal de download idêntico à versão Android.
-2. **`app-pc/app.js`**:
-   - Lógica do aplicativo no PC: busca em tempo real via APIs de streaming (Pobreflix/AniChan), alternância de servidores e dublado, modos de zoom da tela, atalhos de teclado (`D` para download, `Z` para zoom, setas para seek) e gerenciador de download direto para o PC.
+### Arquivos Impactados:
+1. **`app-pc/app.js`**:
+   - Substituição dos endpoints que estavam estacionados no ParkLogic por fontes de streaming ativas e verificadas.
+   - Implementação da lógica de múltiplos servidores com botões de alternância.
+   - Expansão do catálogo com dezenas de filmes, séries e animes com pôsteres HD e sinopses.
+2. **`app-pc/index.html`**:
+   - Adição da barra de seleção de servidores no topo do modal de vídeo.
+   - Inclusão de novas categorias (`Lançamentos 2024`).
 3. **`app-pc/style.css`**:
-   - Folha de estilo cinematográfica Dark Red com fontes modernas, cartões de poster, efeitos de hover, player responsivo e janela de download flutuante.
-4. **`Instalar-e-Rodar-no-PC.bat`**:
-   - Script batch inteligente para Windows que instala e copia o A2 Miguel na pasta `Downloads\A2-Miguel-PC`, cria o atalho no Desktop e executa a aplicação em modo janela nativa.
-5. **`Abrir-no-PC.bat`**:
-   - Atualizado para executar o app local instalado em `Downloads\A2-Miguel-PC` ou chamar o instalador automático caso ainda não exista.
-6. **`.github/workflows/release.yml`**:
-   - Empacota o executável e instalador do PC junto com o APK na release oficial.
-7. **`README.md`**:
-   - Instruções atualizadas passo a passo de como rodar com 1 clique no Windows.
+   - Estilização moderna dos botões de seleção de servidores e badges de qualidade.
+4. **`Instalar-e-Rodar-no-PC.bat` e `Abrir-no-PC.bat`**:
+   - Garantir que a cópia dos novos arquivos atualize a pasta `Downloads\A2-Miguel-PC` imediatamente.
 
 ---
 
 ## 5. Verification Plan
 
-1. **Validação do Script Batch**: Testar a lógica de criação de diretórios em `%USERPROFILE%\Downloads\A2-Miguel-PC` e inicialização no Edge/Chrome no modo `--app`.
-2. **Validação da Interface PC**: Verificar que o catálogo de filmes/séries carrega, a busca funciona, os vídeos tocam sem anúncios e com áudio dublado.
-3. **Validação da Janela de Download**: Testar edição de nome do arquivo, seleção de qualidade e download de vídeo na pasta `Downloads`.
-4. **Validação do APK Android**: Executar `compile_applet` para garantir que o código Android permanece 100% íntegro e compilável.
+1. **Teste do Player Multi-Servidor**: Abrir "Deadpool & Wolverine" e os demais títulos para confirmar que o erro da ParkLogic desapareceu e o vídeo carrega com áudio dublado.
+2. **Teste de Alternância de Servidores**: Clicar nos botões de Servidor 1, 2 e 3 para confirmar que o iframe troca a URL e carrega o stream correspondente.
+3. **Teste do Catálogo Completo**: Verificar que todos os filmes, séries e animes aparecem na tela e que os filtros de categoria funcionam.
+4. **Teste da Busca**: Digitar termos de busca (ex: "Deadpool", "Aranha", "Casa", "Dragon") e verificar o filtro instantâneo.
+5. **Verificação do Build Android**: Executar `compile_applet` para confirmar integridade do projeto geral.

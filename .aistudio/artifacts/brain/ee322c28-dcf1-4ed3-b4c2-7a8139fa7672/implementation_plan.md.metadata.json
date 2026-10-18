@@ -1,6 +1,6 @@
 {
-  "summary": "Plano de implementação para o sistema autônomo do A2 Miguel para PC Windows: script .bat que instala e configura tudo localmente na pasta Downloads, executando o aplicativo completo idêntico à versão mobile/TV (com player sem anúncios, catálogo, busca, zoom, calibração e janela de download de vídeos) sem depender de servidores temporários na nuvem.",
-  "updatedAt": "2026-10-18T12:42:31.353241946Z",
+  "summary": "Plano de implementação detalhado para corrigir o erro de página estacionada (ParkLogic), implementar múltiplos servidores de vídeo com áudio dublado e sem anúncios com seletor de servidores no player, e expandir o catálogo com busca em tempo real e categorias completas de filmes, séries e animes no PC.",
+  "updatedAt": "2026-10-18T12:52:29.802798843Z",
   "requestFeedback": true,
   "userFacing": true
 }

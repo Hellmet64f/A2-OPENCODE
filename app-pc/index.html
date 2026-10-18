@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>A2 Miguel - Filmes, Séries e Animes no PC</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Cabeçalho -->
+    <header class="header">
+        <div class="logo-area" onclick="location.reload()">
+            <div class="logo-icon">A2</div>
+            <div class="logo-text">
+                <h1>A2 MIGUEL</h1>
+                <span>Versão Desktop para PC</span>
+            </div>
+        </div>
+
+        <div class="search-bar">
+            <span class="search-icon">🔍</span>
+            <input type="text" id="searchInput" placeholder="Pesquisar filme, série ou anime..." autocomplete="off">
+        </div>
+
+        <div class="header-actions">
+            <button class="btn-pill" onclick="window.open('https://anichan.to', '_blank')">
+                <span>⛩️</span> AniChan
+            </button>
+            <button class="btn-pill btn-primary" onclick="alert('Pressione a tecla D dentro do reprodutor para abrir a Janela de Download e Edição!')">
+                <span>📥</span> Baixar no PC
+            </button>
+        </div>
+    </header>
+
+    <!-- Barra de Categorias -->
+    <nav class="categories-bar">
+        <div class="chip active" data-type="all">🔥 Todos os Destaques</div>
+        <div class="chip" data-type="movie">🎬 Filmes</div>
+        <div class="chip" data-type="series">📺 Séries</div>
+        <div class="chip" data-type="anime">⛩️ Animes</div>
+    </nav>
+
+    <!-- Banner informativo da pasta de Downloads do PC -->
+    <div class="folder-notice-banner">
+        <div class="folder-notice-text">
+            <span>💻</span>
+            <span>Instalado com sucesso no seu Windows! Seus downloads são organizados na pasta:</span>
+            <span class="folder-path-pill">Downloads\A2-Miguel-PC</span>
+        </div>
+        <button class="btn-pill" style="font-size: 11px; padding: 4px 10px;" onclick="alert('Seus downloads e arquivos do programa ficam salvos em: ' + (navigator.userAgent.includes('Windows') ? '%USERPROFILE%\\Downloads\\A2-Miguel-PC' : 'Downloads/A2-Miguel-PC'))">
+            Ver Pasta
+        </button>
+    </div>
+
+    <!-- Catálogo de Títulos -->
+    <main class="content-section">
+        <div class="section-title">
+            <span>🎬</span> Catálogo Disponível
+        </div>
+        <div class="media-grid" id="mediaGrid">
+            <!-- Cards gerados via app.js -->
+        </div>
+    </main>
+
+    <!-- Modal do Reprodutor de Vídeo -->
+    <div class="player-modal" id="playerModal" style="display: none;">
+        <div class="player-header">
+            <div class="player-title-info">
+                <h2 id="playerTitle">Reproduzindo Vídeo</h2>
+                <span id="playerMeta">A2 Miguel Cinema</span>
+            </div>
+            <div class="player-controls-row">
+                <button class="btn-pill" id="btnPlayerZoom" title="Alternar Zoom da Tela (Tecla Z)">
+                    <span>🔍</span> Zoom Tela
+                </button>
+                <button class="btn-pill btn-primary" id="btnPlayerDownload" title="Abrir Janela de Download (Tecla D)">
+                    <span>📥</span> Baixar Vídeo (D)
+                </button>
+                <button class="btn-pill" id="btnClosePlayer" style="background: #33384c;">
+                    <span>✕</span> Fechar
+                </button>
+            </div>
+        </div>
+
+        <div class="video-container">
+            <div class="video-frame-wrapper" id="videoFrameWrapper">
+                <iframe id="playerFrame" src="about:blank" allowfullscreen allow="autoplay; encrypted-media"></iframe>
+            </div>
+        </div>
+    </div>
+
+    <!-- Janela Dedicada de Download & Edição -->
+    <div class="download-dialog-overlay" id="downloadOverlay" style="display: none;">
+        <div class="download-window">
+            <div class="window-titlebar">
+                <div class="titlebar-left">
+                    <span style="font-size: 18px;">📥</span>
+                    <span class="titlebar-title">A2 Miguel • Janela de Download e Edição no PC</span>
+                </div>
+                <button class="titlebar-close" id="btnCloseDownload">✕</button>
+            </div>
+
+            <div class="window-body">
+                <!-- Nome do arquivo editável -->
+                <div class="form-group">
+                    <label class="form-label">
+                        <span>📝 Nome do Arquivo (Editável)</span>
+                        <span style="color: #64b5f6; font-size: 11px; cursor: pointer;" onclick="document.getElementById('inputDownloadName').value = 'A2_Video_' + Date.now() + '.mp4'">Gerar Automático</span>
+                    </label>
+                    <input type="text" class="form-input" id="inputDownloadName" value="A2_Miguel_Video_1080p.mp4">
+                    <span style="font-size: 11px; color: #7f869e;">O arquivo será salvo com a extensão .mp4 na sua pasta Downloads do PC.</span>
+                </div>
+
+                <!-- Seleção de Qualidade -->
+                <div class="form-group">
+                    <label class="form-label">🎬 Qualidade do Vídeo</label>
+                    <div class="options-row">
+                        <div class="option-box quality-box selected" data-quality="1080p">
+                            <div class="option-title">1080p Full HD</div>
+                            <div class="option-desc">Máxima nitidez</div>
+                        </div>
+                        <div class="option-box quality-box" data-quality="720p">
+                            <div class="option-title">720p HD</div>
+                            <div class="option-desc">Ideal e equilibrado</div>
+                        </div>
+                        <div class="option-box quality-box" data-quality="480p">
+                            <div class="option-title">480p Rápido</div>
+                            <div class="option-desc">Leve e veloz</div>
+                        </div>
+                        <div class="option-box quality-box" data-quality="Original">
+                            <div class="option-title">Original</div>
+                            <div class="option-desc">Fluxo direto</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Seleção da Pasta no PC -->
+                <div class="form-group">
+                    <label class="form-label">📂 Pasta de Destino no Computador</label>
+                    <div class="options-row">
+                        <div class="option-box folder-box selected-blue" data-folder="videos">
+                            <div class="option-title">📂 Downloads\Videos</div>
+                            <div class="option-desc">Pasta padrão</div>
+                        </div>
+                        <div class="option-box folder-box" data-folder="filmes">
+                            <div class="option-title">🎬 Downloads\Filmes</div>
+                            <div class="option-desc">Para longas-metragens</div>
+                        </div>
+                        <div class="option-box folder-box" data-folder="series">
+                            <div class="option-title">📺 Downloads\Series</div>
+                            <div class="option-desc">Para episódios</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="window-footer">
+                <button class="btn-large btn-download-action" id="btnStartDownloadAction">
+                    <span>⬇️</span> BAIXAR VÍDEO AGORA
+                </button>
+                <button class="btn-large btn-secondary" id="btnCancelDownloadAction">
+                    Cancelar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

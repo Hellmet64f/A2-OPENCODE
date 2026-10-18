@@ -44,11 +44,13 @@ jobs:
           mkdir -p release-output
           cp app/build/outputs/apk/debug/*.apk release-output/A2-Miguel-TV.apk || cp $(find app/build/outputs/apk/ -name "*.apk" | head -n 1) release-output/A2-Miguel-TV.apk
 
-          # Package Windows PC Executable Launchers
+          # Package Windows PC Standalone Package (Instalação em Downloads\A2-Miguel-PC)
           mkdir -p pc-package
+          cp Instalar-e-Rodar-no-PC.bat pc-package/
           cp Abrir-no-PC.bat pc-package/
           cp Instalar-Atalho-PC.bat pc-package/
           cp README.md pc-package/
+          cp -r app-pc pc-package/
           cd pc-package && zip -r ../release-output/A2-Miguel-PC-Windows.zip * && cd ..
 
       - name: Upload Release Artifacts

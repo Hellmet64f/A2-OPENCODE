@@ -1,6 +1,6 @@
 {
-  "summary": "Plano de implementação detalhado para o sistema de janela dedicada no PC e na TV para baixar e editar o app e vídeos, incluindo seleção de pasta de salvamento, qualidade (1080p, 720p, 480p), edição de nome do arquivo, e empacotamento executável com release automática no GitHub.",
-  "updatedAt": "2026-10-18T11:55:29.771717544Z",
+  "summary": "Plano de implementação para o sistema autônomo do A2 Miguel para PC Windows: script .bat que instala e configura tudo localmente na pasta Downloads, executando o aplicativo completo idêntico à versão mobile/TV (com player sem anúncios, catálogo, busca, zoom, calibração e janela de download de vídeos) sem depender de servidores temporários na nuvem.",
+  "updatedAt": "2026-10-18T12:42:31.353241946Z",
   "requestFeedback": true,
   "userFacing": true
 }

@@ -1,0 +1,6 @@
+{
+  "name": "A2 Miguel",
+  "description": "Aplicativo A2 Miguel de filmes, séries e animes sem anúncios com player integrado e sistema de esconder opções e controles.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -213,13 +213,20 @@ fun PlayerScreen(
     // Fetch multi-server list + next/prev navigation whenever currentUrl changes
     LaunchedEffect(currentUrl) {
         selectedServerUrl = null
+        availableServers = emptyList()
         val videoId = Regex("""-(\d+)/?$""").find(currentUrl)?.groupValues?.get(1)
-        if (!videoId.isNullOrBlank()) {
+        if (!videoId.isNullOrBlank() && !currentUrl.contains("anichan.to")) {
             val data = SearchService.fetchPlayerData(videoId)
             if (data != null) {
                 availableServers = data.servers
                 nextEpisodeUrl = data.nextEpisodeUrl
                 prevEpisodeUrl = data.prevEpisodeUrl
+                // Carrega automaticamente o servidor direto mais limpo para evitar banners da página wrapper
+                val cleanest = data.servers.firstOrNull()
+                if (cleanest != null && selectedServerUrl == null && currentUrl.contains("pobreflixtv")) {
+                    selectedServerUrl = cleanest.embedUrl
+                    webViewRef?.loadUrl(cleanest.embedUrl)
+                }
             }
         }
     }
@@ -268,6 +275,7 @@ fun PlayerScreen(
     fun persistEpisodeProgress(ep: Episode) {
         val seriesId = playingState.seriesUrl.ifBlank { playingState.url.substringBefore("/episodio/").ifBlank { playingState.url } }
         val cleanTitle = playingState.title.substringBefore(" - T").substringBefore(" - Ep").ifBlank { playingState.title }
+        val isAnimeItem = seriesId.contains("anichan.to") || ep.url.contains("anichan.to") || seriesId.contains("/animes/")
         val item = WatchHistoryItem(
             id = seriesId,
             title = cleanTitle,
@@ -276,7 +284,8 @@ fun PlayerScreen(
             isSeries = true,
             season = ep.season,
             episodeNumber = ep.number,
-            episodeTitle = ep.title
+            episodeTitle = ep.title,
+            isAnime = isAnimeItem
         )
         WatchHistoryManager.saveProgress(context, item)
         onHistoryProgressSaved(item)
@@ -558,7 +567,7 @@ fun PlayerScreen(
                             useWideViewPort = true
                             loadWithOverviewMode = true
                             mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
-                            setSupportMultipleWindows(false)
+                            setSupportMultipleWindows(true)
                             javaScriptCanOpenWindowsAutomatically = false
                             setSupportZoom(false)
                             builtInZoomControls = false
@@ -572,26 +581,95 @@ fun PlayerScreen(
                         CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
                         isVerticalScrollBarEnabled = false
                         isHorizontalScrollBarEnabled = false
+                        val shieldJs = """
+                            (function() {
+                                try {
+                                    Object.defineProperty(window, 'open', {
+                                        value: function() { return null; },
+                                        writable: false,
+                                        configurable: false
+                                    });
+                                } catch(e) { window.open = function() { return null; }; }
+                                window.alert = function() {};
+                                window.confirm = function() { return true; };
+                                window.prompt = function() { return null; };
+                                if (!window.__a2ShieldInstalled) {
+                                    window.__a2ShieldInstalled = true;
+                                    var origAdd = EventTarget.prototype.addEventListener;
+                                    EventTarget.prototype.addEventListener = function(type, listener, options) {
+                                        try {
+                                            if ((type === 'click' || type === 'mousedown' || type === 'touchstart' || type === 'pointerdown') &&
+                                                (this === window || this === document || this === document.body || this === document.documentElement)) {
+                                                var fnStr = listener ? listener.toString() : '';
+                                                if (/window\.open|pop|_blank|location\.href|location\.replace|top\.location|adserver|redirect/i.test(fnStr)) {
+                                                    return;
+                                                }
+                                            }
+                                        } catch(e) {}
+                                        return origAdd.call(this, type, listener, options);
+                                    };
+                                }
+                                function sweepOverlays() {
+                                    try {
+                                        document.querySelectorAll('a[target="_blank"]').forEach(function(a) {
+                                            var href = (a.getAttribute('href') || '').toLowerCase();
+                                            if (href.indexOf('http') === 0 && !/pobreflix|anichan|byse|mixdrop|mxdrop|streamtape|playmogo|dood/.test(href)) {
+                                                a.remove();
+                                            } else {
+                                                a.setAttribute('target', '_self');
+                                            }
+                                        });
+                                        var vw = window.innerWidth || 360;
+                                        var vh = window.innerHeight || 640;
+                                        document.querySelectorAll('div, a, section, aside, ins').forEach(function(el) {
+                                            try {
+                                                if (el.querySelector('video') || el.tagName === 'VIDEO') return;
+                                                var idCls = ((el.id || '') + ' ' + (el.className || '')).toLowerCase();
+                                                if (/(popunder|popup-ad|ad-overlay|banner-ad|adsbox|tigrinho|casino|cassino|aposta)/.test(idCls)) {
+                                                    el.remove();
+                                                    return;
+                                                }
+                                                var st = window.getComputedStyle(el);
+                                                var z = parseInt(st.zIndex, 10) || 0;
+                                                if ((st.position === 'fixed' || st.position === 'absolute') && z >= 900) {
+                                                    var rect = el.getBoundingClientRect();
+                                                    var coversLarge = rect.width >= vw * 0.75 && rect.height >= vh * 0.6;
+                                                    var looksInvisible = parseFloat(st.opacity) < 0.08 || st.backgroundColor === 'transparent' || st.backgroundColor === 'rgba(0, 0, 0, 0)';
+                                                    var hasControls = el.querySelector('button, input, video, .vjs-control-bar, .plyr__controls');
+                                                    if (coversLarge && looksInvisible && !hasControls) {
+                                                        el.style.pointerEvents = 'none';
+                                                        el.style.display = 'none';
+                                                    }
+                                                }
+                                            } catch(e) {}
+                                        });
+                                        document.querySelectorAll('.ytp-ad-skip-button, .skip-ad, [class*="skip-ad"]').forEach(function(b) {
+                                            try { b.click(); } catch(e) {}
+                                        });
+                                    } catch(e) {}
+                                }
+                                sweepOverlays();
+                                if (!window.__a2SweepTimer) {
+                                    window.__a2SweepTimer = setInterval(sweepOverlays, 1200);
+                                }
+                            })();
+                        """.trimIndent()
+
                         webViewClient = object : WebViewClient() {
                             override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
                                 super.onPageStarted(view, url, favicon)
                                 isLoadingPage = true
                                 view?.evaluateJavascript(
                                     """
+                                    $shieldJs
                                     (function() {
-                                        try {
-                                            window.open = function() { return null; };
-                                            window.alert = function() {};
-                                            window.confirm = function() { return true; };
-                                            window.prompt = function() { return null; };
-                                            var meta = document.querySelector('meta[name="viewport"]');
-                                            if (!meta) {
-                                                meta = document.createElement('meta');
-                                                meta.name = 'viewport';
-                                                if (document.head) document.head.appendChild(meta);
-                                            }
-                                            if (meta) meta.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
-                                        } catch(e) {}
+                                        var meta = document.querySelector('meta[name="viewport"]');
+                                        if (!meta) {
+                                            meta = document.createElement('meta');
+                                            meta.name = 'viewport';
+                                            if (document.head) document.head.appendChild(meta);
+                                        }
+                                        if (meta) meta.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
                                     })();
                                     """.trimIndent(),
                                     null
@@ -605,15 +683,12 @@ fun PlayerScreen(
                                 view?.postDelayed({ dispatchAccuratePlayClick(focusXRatio, focusYRatio) }, 2200)
                                 view?.evaluateJavascript(
                                     """
+                                    $shieldJs
                                     (function() {
-                                        window.open = function() { return null; };
-                                        document.querySelectorAll('a[target="_blank"]').forEach(function(a) {
-                                            a.setAttribute('target', '_self');
-                                        });
                                         var oldStyle = document.getElementById('inapp-cinema-style');
                                         if (oldStyle) oldStyle.remove();
                                         var css = 'html, body { margin:0!important; padding:0!important; background:#000!important; color:#fff!important; } ' +
-                                            'header, footer, nav, .site-header, .site-footer, #ipsLayout_header, #ipsLayout_footer, .sidebar, #comments, .comments, .ads, .banner, .floating-ads, [id*="ad-"], [class*="popup"] { display:none!important; } ' +
+                                            'header, footer, nav, .site-header, .site-footer, #ipsLayout_header, #ipsLayout_footer, .sidebar, #comments, .comments, .ads, .banner, .floating-ads, [id*="ad-"], [class*="popup"], [class*="popunder"], ins.adsbygoogle { display:none!important; pointer-events:none!important; } ' +
                                             '#view, #player, .player-area, iframe, video { width:100%!important; max-width:100%!important; min-height:260px!important; border:none!important; }';
                                         var st = document.createElement('style');
                                         st.id = 'inapp-cinema-style';
@@ -628,9 +703,17 @@ fun PlayerScreen(
                             override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
                                 val uri = request?.url ?: return false
                                 val scheme = uri.scheme?.lowercase() ?: ""
-                                if (scheme != "http" && scheme != "https") return true
+                                if (scheme != "http" && scheme != "https") {
+                                    AdBlockManager.recordBlocked()
+                                    return true
+                                }
                                 val full = uri.toString()
                                 if (AdBlockManager.isBlockedUrl(full)) {
+                                    AdBlockManager.recordBlocked()
+                                    return true
+                                }
+                                val activeBase = selectedServerUrl ?: currentUrl
+                                if (request.isForMainFrame && !AdBlockManager.isAllowedTopFrameNavigation(activeBase, full)) {
                                     AdBlockManager.recordBlocked()
                                     return true
                                 }
@@ -641,13 +724,16 @@ fun PlayerScreen(
                                 val u = request?.url?.toString().orEmpty()
                                 if (AdBlockManager.isBlockedUrl(u)) {
                                     AdBlockManager.recordBlocked()
-                                    return WebResourceResponse("text/plain", "utf-8", ByteArrayInputStream(ByteArray(0)))
+                                    return WebResourceResponse("application/javascript", "utf-8", ByteArrayInputStream("/* blocked */".toByteArray()))
                                 }
                                 return super.shouldInterceptRequest(view, request)
                             }
                         }
                         webChromeClient = object : WebChromeClient() {
-                            override fun onCreateWindow(view: WebView?, isDialog: Boolean, isUserGesture: Boolean, resultMsg: Message?): Boolean = false
+                            override fun onCreateWindow(view: WebView?, isDialog: Boolean, isUserGesture: Boolean, resultMsg: Message?): Boolean {
+                                AdBlockManager.recordBlocked()
+                                return false
+                            }
                             override fun onShowCustomView(view: View?, callback: CustomViewCallback?) {
                                 super.onShowCustomView(view, callback)
                                 customView = view
@@ -827,7 +913,7 @@ fun PlayerScreen(
                                     color = if (isSel) CrimsonPrimary else ObsidianCard,
                                     shape = RoundedCornerShape(8.dp),
                                     border = BorderStroke(1.dp, if (isSel) Color.White else ObsidianStroke),
-                                    modifier = Modifier.heightIn(min = 38.dp)
+                                    modifier = Modifier.heightIn(min = 48.dp)
                                 ) {
                                     Text(
                                         text = server.name,

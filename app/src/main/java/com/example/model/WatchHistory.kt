@@ -5,7 +5,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 data class WatchHistoryItem(
-    val id: String, // URL principal do filme ou da série
+    val id: String, // URL principal do filme, série ou anime
     val title: String,
     val coverUrl: String,
     val currentUrl: String, // URL direta do filme ou do episódio atual
@@ -17,7 +17,8 @@ data class WatchHistoryItem(
     val favorite: Boolean = false,
     val completed: Boolean = false,
     val progressSeconds: Long = 0L,
-    val timestamp: Long = System.currentTimeMillis()
+    val timestamp: Long = System.currentTimeMillis(),
+    val isAnime: Boolean = false
 ) {
     fun episodeKey(s: Int = season, ep: Int = episodeNumber): String = "${s}x${ep}"
 
@@ -103,7 +104,8 @@ object WatchHistoryManager {
                 episodeNumber = 1,
                 episodeTitle = if (movie.isSeries) "Episódio 1" else movie.title,
                 favorite = true,
-                completed = false
+                completed = false,
+                isAnime = movie.isAnime
             )
         }
         current.removeAll {
@@ -260,7 +262,10 @@ object WatchHistoryManager {
                         if (epKey.isNotBlank()) watchedList.add(epKey)
                     }
                 }
-                val isSeriesFlag = obj.optBoolean("isSeries", obj.optString("mediaType", "") == "series")
+                val isAnimeFlag = obj.optBoolean("isAnime", obj.optString("mediaType", "") == "anime") ||
+                    id.contains("anichan.to")
+                val isSeriesFlag = obj.optBoolean("isSeries", obj.optString("mediaType", "") in listOf("series", "anime")) ||
+                    isAnimeFlag
                 list.add(
                     WatchHistoryItem(
                         id = id.ifBlank { currentUrl },
@@ -275,7 +280,8 @@ object WatchHistoryManager {
                         favorite = obj.optBoolean("favorite", false),
                         completed = obj.optBoolean("completed", false),
                         progressSeconds = obj.optLong("progressSeconds", 0L).coerceAtLeast(0L),
-                        timestamp = obj.optLong("timestamp", System.currentTimeMillis())
+                        timestamp = obj.optLong("timestamp", System.currentTimeMillis()),
+                        isAnime = isAnimeFlag
                     )
                 )
             }
@@ -293,7 +299,12 @@ object WatchHistoryManager {
             obj.put("coverUrl", h.coverUrl)
             obj.put("currentUrl", h.currentUrl)
             obj.put("isSeries", h.isSeries)
-            obj.put("mediaType", if (h.isSeries) "series" else "movie")
+            obj.put("isAnime", h.isAnime)
+            obj.put("mediaType", when {
+                h.isAnime -> "anime"
+                h.isSeries -> "series"
+                else -> "movie"
+            })
             obj.put("season", h.season)
             obj.put("episodeNumber", h.episodeNumber)
             obj.put("episodeTitle", h.episodeTitle)

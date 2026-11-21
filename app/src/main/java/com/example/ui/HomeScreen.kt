@@ -67,6 +67,7 @@ fun NetflixHome(
     state: AppState.HomeLoaded,
     userEmail: String?,
     userName: String?,
+    isGuestMode: Boolean = false,
     adBlockRuleCount: Int,
     adBlockBlockedSession: Int,
     adBlockUpdating: Boolean,
@@ -88,6 +89,7 @@ fun NetflixHome(
     onForceUpdateAdBlock: () -> Unit = {},
     onSyncCloudNow: () -> Unit = {},
     onImportJsonBackup: (String) -> Unit = {},
+    onSwitchToGoogleLogin: () -> Unit = {},
     onSignOut: () -> Unit = {}
 ) {
     val context = LocalContext.current
@@ -99,13 +101,15 @@ fun NetflixHome(
 
     val displayedMovies = remember(state.allMovies, state.currentTab, state.selectedCategory, state.watchHistory) {
         val base = when (state.currentTab) {
-            "Filmes" -> state.allMovies.filter { !it.isSeries }
-            "Series" -> state.allMovies.filter { it.isSeries }
+            "Filmes" -> state.allMovies.filter { !it.isSeries && !it.isAnime }
+            "Series" -> state.allMovies.filter { it.isSeries && !it.isAnime }
+            "Animes" -> state.allMovies.filter { it.isAnime }
             else -> state.allMovies
         }
         when (state.selectedCategory) {
-            "Filmes" -> base.filter { !it.isSeries }
-            "Séries" -> base.filter { it.isSeries }
+            "Filmes" -> base.filter { !it.isSeries && !it.isAnime }
+            "Séries" -> base.filter { it.isSeries && !it.isAnime }
+            "Animes" -> base.filter { it.isAnime }
             "Favoritos" -> base.filter { m -> historyByUrl[m.url]?.favorite == true }
             "Já Vistos" -> base.filter { m ->
                 val h = historyByUrl[m.url]
@@ -134,6 +138,7 @@ fun NetflixHome(
         DataAndAdBlockDialog(
             userEmail = userEmail,
             userName = userName,
+            isGuestMode = isGuestMode,
             history = state.watchHistory,
             adBlockRuleCount = adBlockRuleCount,
             adBlockBlockedSession = adBlockBlockedSession,
@@ -143,6 +148,10 @@ fun NetflixHome(
             onForceUpdateAdBlock = onForceUpdateAdBlock,
             onSyncCloudNow = onSyncCloudNow,
             onImportJsonBackup = onImportJsonBackup,
+            onSwitchToGoogleLogin = {
+                showDataAdBlockDialog = false
+                onSwitchToGoogleLogin()
+            },
             onSignOut = {
                 showDataAdBlockDialog = false
                 onSignOut()
@@ -224,6 +233,20 @@ fun NetflixHome(
                         modifier = Modifier.testTag("nav_rail_series")
                     )
                     NavigationRailItem(
+                        selected = state.currentTab == "Animes",
+                        onClick = { onSelectTab("Animes") },
+                        icon = { Icon(Icons.Default.AutoAwesome, contentDescription = "Animes") },
+                        label = { Text("Animes", fontSize = 11.sp) },
+                        colors = NavigationRailItemDefaults.colors(
+                            selectedIconColor = Color.Black,
+                            selectedTextColor = AmberGold,
+                            indicatorColor = AmberGold,
+                            unselectedIconColor = TextSecondary,
+                            unselectedTextColor = TextSecondary
+                        ),
+                        modifier = Modifier.testTag("nav_rail_animes")
+                    )
+                    NavigationRailItem(
                         selected = state.currentTab == "MeusTitulos",
                         onClick = { onSelectTab("MeusTitulos") },
                         icon = { Icon(Icons.Default.History, contentDescription = "Histórico") },
@@ -281,7 +304,7 @@ fun NetflixHome(
                                 selected = state.currentTab == "Series",
                                 onClick = { onSelectTab("Series") },
                                 icon = { Icon(Icons.Default.Tv, contentDescription = "Séries") },
-                                label = { Text("Séries", maxLines = 1) },
+                                label = { Text("Séries", maxLines = 1, fontSize = 11.sp) },
                                 colors = NavigationBarItemDefaults.colors(
                                     selectedIconColor = Color.White,
                                     selectedTextColor = CrimsonPrimary,
@@ -292,10 +315,24 @@ fun NetflixHome(
                                 modifier = Modifier.testTag("nav_bottom_series")
                             )
                             NavigationBarItem(
+                                selected = state.currentTab == "Animes",
+                                onClick = { onSelectTab("Animes") },
+                                icon = { Icon(Icons.Default.AutoAwesome, contentDescription = "Animes") },
+                                label = { Text("Animes", maxLines = 1, fontSize = 11.sp) },
+                                colors = NavigationBarItemDefaults.colors(
+                                    selectedIconColor = Color.Black,
+                                    selectedTextColor = AmberGold,
+                                    indicatorColor = AmberGold,
+                                    unselectedIconColor = TextSecondary,
+                                    unselectedTextColor = TextSecondary
+                                ),
+                                modifier = Modifier.testTag("nav_bottom_animes")
+                            )
+                            NavigationBarItem(
                                 selected = state.currentTab == "MeusTitulos",
                                 onClick = { onSelectTab("MeusTitulos") },
                                 icon = { Icon(Icons.Default.Bookmarks, contentDescription = "Salvos e Histórico") },
-                                label = { Text("Histórico", maxLines = 1) },
+                                label = { Text("Histórico", maxLines = 1, fontSize = 11.sp) },
                                 colors = NavigationBarItemDefaults.colors(
                                     selectedIconColor = Color.Black,
                                     selectedTextColor = EmeraldAdBlock,
@@ -431,8 +468,9 @@ fun NetflixHome(
                                     ) {
                                         Text(
                                             text = when (state.currentTab) {
-                                                "Filmes" -> "Filmes Disponíveis"
-                                                "Series" -> "Séries Completas"
+                                                "Filmes" -> "Filmes Disponíveis (${displayedMovies.size})"
+                                                "Series" -> "Séries Completas (${displayedMovies.size})"
+                                                "Animes" -> "Animes & AniChan (${displayedMovies.size})"
                                                 else -> "Catálogo Completo (${displayedMovies.size})"
                                             },
                                             style = MaterialTheme.typography.titleLarge,
@@ -533,7 +571,7 @@ fun HomeTopBar(
                     letterSpacing = 1.sp
                 )
                 Text(
-                    text = "Filmes & Séries",
+                    text = "Filmes, Séries & Animes",
                     color = TextSecondary,
                     fontSize = 10.sp
                 )
@@ -605,7 +643,7 @@ fun HomeTopBar(
             ) {
                 Icon(
                     imageVector = Icons.Default.Search,
-                    contentDescription = "Buscar filmes e séries",
+                    contentDescription = "Buscar filmes, séries e animes",
                     tint = Color.White
                 )
             }
@@ -618,7 +656,7 @@ fun CategoryFilterChips(
     selectedCategory: String,
     onSelectCategory: (String) -> Unit
 ) {
-    val categories = listOf("Tudo", "Filmes", "Séries", "Favoritos", "Já Vistos")
+    val categories = listOf("Tudo", "Filmes", "Séries", "Animes", "Favoritos", "Já Vistos")
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -640,8 +678,12 @@ fun CategoryFilterChips(
                     )
                 },
                 colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = if (cat == "Já Vistos") EmeraldAdBlock else if (cat == "Favoritos") AmberGold else CrimsonPrimary,
-                    selectedLabelColor = if (cat == "Favoritos" || cat == "Já Vistos") Color.Black else Color.White,
+                    selectedContainerColor = when (cat) {
+                        "Já Vistos" -> EmeraldAdBlock
+                        "Favoritos", "Animes" -> AmberGold
+                        else -> CrimsonPrimary
+                    },
+                    selectedLabelColor = if (cat in listOf("Favoritos", "Já Vistos", "Animes")) Color.Black else Color.White,
                     containerColor = ObsidianCard,
                     labelColor = TextSecondary
                 ),
@@ -713,12 +755,16 @@ fun HeroBanner(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Surface(
-                    color = CrimsonPrimary,
+                    color = if (movie.isAnime) AmberGold else CrimsonPrimary,
                     shape = RoundedCornerShape(6.dp)
                 ) {
                     Text(
-                        text = if (movie.isSeries) "SÉRIE EM DESTAQUE" else "FILME EM DESTAQUE",
-                        color = Color.White,
+                        text = when {
+                            movie.isAnime -> "ANIME EM DESTAQUE"
+                            movie.isSeries -> "SÉRIE EM DESTAQUE"
+                            else -> "FILME EM DESTAQUE"
+                        },
+                        color = if (movie.isAnime) Color.Black else Color.White,
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Black,
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
@@ -764,7 +810,11 @@ fun HeroBanner(
                     Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = if (movie.isSeries) "Ver Temporadas & Episódios" else "Assistir Agora",
+                        text = when {
+                            movie.isAnime -> "Ver Episódios (Anime)"
+                            movie.isSeries -> "Ver Temporadas & Episódios"
+                            else -> "Assistir Agora"
+                        },
                         fontWeight = FontWeight.Bold,
                         fontSize = 13.sp
                     )
@@ -853,7 +903,11 @@ fun ContinueWatchingCarousel(
                             )
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
-                                text = if (item.isSeries) "T${item.season} • Ep ${item.episodeNumber}" else "Filme",
+                                text = when {
+                                    item.isAnime -> "Anime • Ep ${item.episodeNumber}"
+                                    item.isSeries -> "T${item.season} • Ep ${item.episodeNumber}"
+                                    else -> "Filme"
+                                },
                                 color = AmberGold,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 11.sp
@@ -939,15 +993,23 @@ fun MoviePosterCard(
                 modifier = Modifier.fillMaxSize()
             )
 
-            // Type Badge (SÉRIE / FILME)
+            // Type Badge (ANIME / SÉRIE / FILME)
             Surface(
-                color = if (movie.isSeries) CrimsonPrimary else CyanAccent,
+                color = when {
+                    movie.isAnime -> AmberGold
+                    movie.isSeries -> CrimsonPrimary
+                    else -> CyanAccent
+                },
                 shape = RoundedCornerShape(bottomEnd = 8.dp),
                 modifier = Modifier.align(Alignment.TopStart)
             ) {
                 Text(
-                    text = if (movie.isSeries) "SÉRIE" else "FILME",
-                    color = if (movie.isSeries) Color.White else Color.Black,
+                    text = when {
+                        movie.isAnime -> "ANIME"
+                        movie.isSeries -> "SÉRIE"
+                        else -> "FILME"
+                    },
+                    color = if (movie.isSeries && !movie.isAnime) Color.White else Color.Black,
                     fontSize = 9.sp,
                     fontWeight = FontWeight.Black,
                     modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
@@ -1208,13 +1270,21 @@ fun WatchHistoryCard(
                     modifier = Modifier.fillMaxSize()
                 )
                 Surface(
-                    color = if (item.isSeries) CrimsonPrimary else CyanAccent,
+                    color = when {
+                        item.isAnime -> AmberGold
+                        item.isSeries -> CrimsonPrimary
+                        else -> CyanAccent
+                    },
                     shape = RoundedCornerShape(bottomEnd = 6.dp),
                     modifier = Modifier.align(Alignment.TopStart)
                 ) {
                     Text(
-                        text = if (item.isSeries) "SÉRIE" else "FILME",
-                        color = if (item.isSeries) Color.White else Color.Black,
+                        text = when {
+                            item.isAnime -> "ANIME"
+                            item.isSeries -> "SÉRIE"
+                            else -> "FILME"
+                        },
+                        color = if (item.isSeries && !item.isAnime) Color.White else Color.Black,
                         fontSize = 8.sp,
                         fontWeight = FontWeight.Black,
                         modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
@@ -1378,6 +1448,7 @@ fun WatchHistoryCard(
 fun DataAndAdBlockDialog(
     userEmail: String?,
     userName: String?,
+    isGuestMode: Boolean = false,
     history: List<WatchHistoryItem>,
     adBlockRuleCount: Int,
     adBlockBlockedSession: Int,
@@ -1387,6 +1458,7 @@ fun DataAndAdBlockDialog(
     onForceUpdateAdBlock: () -> Unit,
     onSyncCloudNow: () -> Unit,
     onImportJsonBackup: (String) -> Unit,
+    onSwitchToGoogleLogin: () -> Unit = {},
     onSignOut: () -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -1414,7 +1486,7 @@ fun DataAndAdBlockDialog(
                 Spacer(modifier = Modifier.width(10.dp))
                 Column {
                     Text("Central A2 Miguel", fontWeight = FontWeight.Black, color = CrimsonPrimary, fontSize = 18.sp)
-                    Text("AdBlock 70+ • Dados Grátis na Nuvem", color = TextSecondary, fontSize = 11.sp)
+                    Text("AdBlock 100+ • Dados Grátis na Nuvem", color = TextSecondary, fontSize = 11.sp)
                 }
             }
         },
@@ -1439,7 +1511,7 @@ fun DataAndAdBlockDialog(
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(Icons.Default.Shield, contentDescription = null, tint = EmeraldAdBlock, modifier = Modifier.size(18.dp))
                                 Spacer(modifier = Modifier.width(6.dp))
-                                Text("AdBlock 70+ Auto-Atualizável", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                Text("AdBlock 100+ Auto-Atualizável", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                             }
                             Text(
                                 text = "$adBlockRuleCount regras",
@@ -1496,39 +1568,63 @@ fun DataAndAdBlockDialog(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("☁️ Salvar Dados de Graça (Celular & PC)", color = AmberGold, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                         Text(
-                            text = "Conta conectada: ${userName ?: userEmail ?: "Google"}",
+                            text = if (isGuestMode) "👤 Modo Convidado (Dados Locais Grátis)" else "☁️ Salvar Dados de Graça (Celular & PC)",
+                            color = AmberGold,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp
+                        )
+                        Text(
+                            text = if (isGuestMode) "Você está navegando como Convidado (sem login)." else "Conta conectada: ${userName ?: userEmail ?: "Google"}",
                             color = TextPrimary,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.SemiBold
                         )
-                        if (!userEmail.isNullOrBlank()) {
-                            Text(text = userEmail, color = TextSecondary, fontSize = 11.sp)
-                        }
-
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                        if (isGuestMode) {
+                            Text(
+                                text = "Seu histórico e favoritos estão salvos neste aparelho. Conecte sua conta Google quando quiser enviar tudo para a nuvem.",
+                                color = TextSecondary,
+                                fontSize = 11.sp
+                            )
                             Button(
-                                onClick = onSyncCloudNow,
+                                onClick = onSwitchToGoogleLogin,
                                 colors = ButtonDefaults.buttonColors(containerColor = CrimsonPrimary),
                                 shape = RoundedCornerShape(10.dp),
                                 modifier = Modifier
-                                    .weight(1f)
+                                    .fillMaxWidth()
                                     .heightIn(min = 48.dp)
+                                    .testTag("guest_connect_google_button")
                             ) {
-                                Text("Sincronizar", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                Text("Conectar Conta Google (Salvar na Nuvem)", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                             }
-                            OutlinedButton(
-                                onClick = onSignOut,
-                                shape = RoundedCornerShape(10.dp),
-                                border = BorderStroke(1.dp, ObsidianStroke),
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .heightIn(min = 48.dp)
-                            ) {
-                                Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = null, tint = TextPrimary, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("Sair", color = TextPrimary, fontSize = 12.sp)
+                        } else {
+                            if (!userEmail.isNullOrBlank()) {
+                                Text(text = userEmail, color = TextSecondary, fontSize = 11.sp)
+                            }
+
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                                Button(
+                                    onClick = onSyncCloudNow,
+                                    colors = ButtonDefaults.buttonColors(containerColor = CrimsonPrimary),
+                                    shape = RoundedCornerShape(10.dp),
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .heightIn(min = 48.dp)
+                                ) {
+                                    Text("Sincronizar", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                }
+                                OutlinedButton(
+                                    onClick = onSignOut,
+                                    shape = RoundedCornerShape(10.dp),
+                                    border = BorderStroke(1.dp, ObsidianStroke),
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .heightIn(min = 48.dp)
+                                ) {
+                                    Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = null, tint = TextPrimary, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("Sair", color = TextPrimary, fontSize = 12.sp)
+                                }
                             }
                         }
 
@@ -1590,7 +1686,7 @@ fun DataAndAdBlockDialog(
                     }
                 }
 
-                // 3. Credits (Pobreflix & Creator, no AniChan)
+                // 3. Credits (Pobreflix, AniChan & Creator)
                 Surface(
                     color = ObsidianCard,
                     shape = RoundedCornerShape(14.dp),
@@ -1615,7 +1711,7 @@ fun DataAndAdBlockDialog(
                             }
                             OutlinedButton(
                                 onClick = {
-                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.pobreflixtv.delivery/"))
+                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.pobreflixtv.codes/"))
                                     intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                                     try { context.startActivity(intent) } catch (_: Exception) {}
                                 },
@@ -1624,7 +1720,20 @@ fun DataAndAdBlockDialog(
                                     .heightIn(min = 48.dp),
                                 border = BorderStroke(1.dp, ObsidianStroke)
                             ) {
-                                Text("Pobreflix TV", color = TextPrimary, fontSize = 11.sp)
+                                Text("Pobreflix", color = TextPrimary, fontSize = 11.sp)
+                            }
+                            OutlinedButton(
+                                onClick = {
+                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://anichan.to/"))
+                                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                    try { context.startActivity(intent) } catch (_: Exception) {}
+                                },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .heightIn(min = 48.dp),
+                                border = BorderStroke(1.dp, AmberGold.copy(alpha = 0.6f))
+                            ) {
+                                Text("AniChan", color = AmberGold, fontSize = 11.sp)
                             }
                         }
                     }

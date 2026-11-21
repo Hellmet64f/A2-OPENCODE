@@ -33,13 +33,21 @@ class A2MiguelCoreUnitTest {
     }
 
     @Test
-    fun `adBlockManager has at least 60 baseline rules and filters ads without blocking streams`() {
-        assertTrue(AdBlockManager.getBaselineCount() >= 60)
+    fun `adBlockManager has at least 100 baseline rules and blocks heuristic ads and redirects without blocking streams`() {
+        assertTrue(AdBlockManager.getBaselineCount() >= 100)
         assertTrue(AdBlockManager.isBlockedUrl("https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"))
         assertTrue(AdBlockManager.isBlockedUrl("https://www.popads.net/pop.js"))
         assertTrue(AdBlockManager.isBlockedUrl("https://casino-tigrinho.example.com/ad"))
-        assertFalse(AdBlockManager.isBlockedUrl("https://www.pobreflixtv.delivery/filmes/teste"))
-        assertFalse(AdBlockManager.isBlockedUrl("https://byse.sx/e/abc123"))
+        assertTrue(AdBlockManager.isBlockedUrl("https://mxdrop.click/xads.js?v=2.0.1"))
+        assertTrue(AdBlockManager.isBlockedUrl("https://qq.soakysecrets.com/script.js"))
+        assertTrue(AdBlockManager.isBlockedUrl("https://ww1.parklogic.com/landing"))
+        assertFalse(AdBlockManager.isBlockedUrl("https://www.pobreflixtv.codes/filmes/teste"))
+        assertFalse(AdBlockManager.isBlockedUrl("https://anichan.to/anime/21/one-piece/1"))
+        assertFalse(AdBlockManager.isBlockedUrl("https://bysebuho.com/e/abc123"))
+
+        assertTrue(AdBlockManager.isAllowedTopFrameNavigation("https://bysebuho.com/e/abc123", "https://bysebuho.com/e/abc123?t=1"))
+        assertTrue(AdBlockManager.isAllowedTopFrameNavigation("https://anichan.to/anime/21/one-piece/1", "https://anichan.to/anime/21/one-piece/2"))
+        assertFalse(AdBlockManager.isAllowedTopFrameNavigation("https://mxdrop.click/e/abc123", "https://qq.soakysecrets.com/offer"))
 
         assertEquals("ads.tracker.net", AdBlockManager.parseHostLine("0.0.0.0 ads.tracker.net # ad"))
         assertEquals("banner.example.org", AdBlockManager.parseHostLine("127.0.0.1 banner.example.org"))
@@ -87,7 +95,7 @@ class A2MiguelCoreUnitTest {
     }
 
     @Test
-    fun `searchService parsers extract catalog cards series metadata episodes and player servers`() {
+    fun `searchService parsers extract catalog cards series metadata episodes player servers and anichan results`() {
         val html = """
             <div>
               <a href="/filmes/deadpool-e-wolverine-2024/">
@@ -98,14 +106,19 @@ class A2MiguelCoreUnitTest {
                 <img src="/uploads/boys.jpg" title="The Boys" />
                 <span>2024</span>
               </a>
+              <a href="https://www.pobreflixtv.delivery/filmes/batman-begins/">
+                <img src="/uploads/batman.jpg" alt="Batman Begins" />
+                <span>2005</span>
+              </a>
             </div>
         """.trimIndent()
         val cards = SearchService.parseCardsFromHtml(html)
-        assertEquals(2, cards.size)
+        assertEquals(3, cards.size)
         assertEquals("Deadpool & Wolverine", cards[0].title)
         assertFalse(cards[0].isSeries)
-        assertEquals("https://www.pobreflixtv.delivery/series/the-boys/", cards[1].url)
+        assertEquals("https://www.pobreflixtv.codes/series/the-boys/", cards[1].url)
         assertTrue(cards[1].isSeries)
+        assertEquals("https://www.pobreflixtv.codes/filmes/batman-begins/", cards[2].url)
 
         val seriesHtml = """
             <div data-video-id="98765">
@@ -133,20 +146,44 @@ class A2MiguelCoreUnitTest {
         val playerJson = """
             {
               "players": [
-                {"label": "MixDrop", "url": "https://mixdrop.ag/e/"},
-                {"label": "Byse", "url": "https://byse.sx/e/"}
+                {"label": "MixDrop", "url": "https://mxdrop.click/e/"},
+                {"label": "Byse", "url": "https://bysebuho.com/e/"},
+                {"label": "StreamTape", "url": "https://streamtape.com/e/"}
               ],
-              "servers_dub": "byse=abc123&mixdrop=xyz789",
-              "servers_leg": "byse=leg999",
+              "servers_dub": "byse=abc123&mixdrop=xyz789&streamtape=hide",
+              "servers_leg": "byse=leg999&mixdrop=null",
               "navigation": {"prev": "/episodios/ep-1/", "next": "/episodios/ep-3/"}
             }
         """.trimIndent()
         val playerData = SearchService.parsePlayerDataJson(playerJson, preferredAudio = "Dublado")
         assertNotNull(playerData)
         assertEquals(3, playerData!!.servers.size)
+        assertTrue(playerData.servers.none { it.embedUrl.endsWith("/hide") || it.embedUrl.endsWith("/null") })
         assertTrue(playerData.servers.first().name.contains("Byse"))
         assertEquals("Dublado", playerData.servers.first().audio)
-        assertEquals("https://www.pobreflixtv.delivery/episodios/ep-3/", playerData.nextEpisodeUrl)
+        assertEquals("https://www.pobreflixtv.codes/episodios/ep-3/", playerData.nextEpisodeUrl)
+
+        val aniChanSearchJson = """
+            {"results":[
+              {"id": 21, "title": "ONE PIECE", "poster": "https://s4.anilist.co/onepiece.jpg", "startDate": {"year": 1999}},
+              {"id": 188055, "title": "Dragon Ball DAIMA", "poster": "https://s4.anilist.co/daima.jpg", "startDate": {"year": 2024}}
+            ]}
+        """.trimIndent()
+        val aniItems = SearchService.parseAniChanResultsJson(aniChanSearchJson)
+        assertEquals(2, aniItems.size)
+        assertTrue(aniItems[0].isAnime)
+        assertTrue(aniItems[0].isSeries)
+        assertEquals("https://anichan.to/anime/21/one-piece", aniItems[0].url)
+        assertEquals("1999", aniItems[0].year)
+
+        val aniMeta = SearchService.parseAniChanEpisodesMetadata(
+            animeId = 188055,
+            slug = "dragon-ball-daima",
+            episodesJson = """{"episodes": 3, "dubAvailable": true}"""
+        )
+        assertEquals("anichan_188055", aniMeta.videoId)
+        assertEquals(3, aniMeta.fallbackEpisodes.size)
+        assertEquals("https://anichan.to/anime/188055/dragon-ball-daima/2", aniMeta.fallbackEpisodes[1].url)
     }
 
     @Test
@@ -200,5 +237,50 @@ class A2MiguelCoreUnitTest {
         assertFalse(prefsUpdate.containsKey("userId"))
         assertFalse(prefsUpdate.containsKey("createdAt"))
         assertEquals("full", prefsUpdate["zoomPreset"])
+    }
+
+    @Test
+    fun `guestModePrefs toggles local guest mode and pending cloud sync flag`() {
+        com.example.ui.GuestModePrefs.setGuestMode(context, false)
+        com.example.ui.GuestModePrefs.clearPendingGuestSync(context)
+        assertFalse(com.example.ui.GuestModePrefs.isGuestMode(context))
+        assertFalse(com.example.ui.GuestModePrefs.hasPendingGuestSync(context))
+
+        com.example.ui.GuestModePrefs.setGuestMode(context, true)
+        assertTrue(com.example.ui.GuestModePrefs.isGuestMode(context))
+        assertTrue(com.example.ui.GuestModePrefs.hasPendingGuestSync(context))
+
+        com.example.ui.GuestModePrefs.setGuestMode(context, false)
+        assertFalse(com.example.ui.GuestModePrefs.isGuestMode(context))
+        assertTrue(com.example.ui.GuestModePrefs.hasPendingGuestSync(context))
+
+        com.example.ui.GuestModePrefs.clearPendingGuestSync(context)
+        assertFalse(com.example.ui.GuestModePrefs.hasPendingGuestSync(context))
+    }
+
+    @Test
+    fun `anime watchHistoryItem preserves isAnime flag and serializes anime mediaType for firestore`() {
+        val animeUrl = "https://anichan.to/anime/21/one-piece"
+        val animeItem = WatchHistoryItem(
+            id = animeUrl,
+            title = "ONE PIECE",
+            coverUrl = "https://s4.anilist.co/onepiece.jpg",
+            currentUrl = "https://anichan.to/anime/21/one-piece/12",
+            isSeries = true,
+            isAnime = true,
+            season = 1,
+            episodeNumber = 12,
+            episodeTitle = "Episódio 12"
+        )
+        WatchHistoryManager.saveProgress(context, animeItem, markCurrentWatched = true)
+        val json = WatchHistoryManager.exportToJson(context)
+        WatchHistoryManager.clearAll(context)
+        val imported = WatchHistoryManager.importFromJson(context, json)
+        assertEquals(1, imported.size)
+        assertTrue(imported.first().isAnime)
+        assertTrue(imported.first().isSeries)
+
+        val createMap = FirestoreCodec.toHistoryCreateMap("uid_anime", animeItem)
+        assertEquals("anime", createMap["mediaType"])
     }
 }

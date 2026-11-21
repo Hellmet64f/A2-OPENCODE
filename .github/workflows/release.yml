@@ -63,21 +63,22 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_type == 'tag' && github.ref_name || 'v1.0.0' }}
-          name: "A2 Miguel - Filmes e Séries Celular, TV & PC (${{ github.ref_type == 'tag' && github.ref_name || 'v1.0.0' }})"
+          name: "A2 Miguel - Filmes, Séries e Animes Celular, TV & PC (${{ github.ref_type == 'tag' && github.ref_name || 'v1.0.0' }})"
           body: |
-            ### 🎬 A2 Miguel — Filmes e Séries (Celular, TV & Windows PC)
+            ### 🎬 A2 Miguel — Filmes, Séries e Animes (Celular, TV & Windows PC)
 
             **Arquivos disponíveis para download nesta Release:**
-            1. 📱 **`A2-Miguel-TV.apk`**: Aplicativo completo focado em **Celular Android**, **Tablets** e **Smart TVs / TV Box** com busca ao vivo, catálogo completo, AdBlock 70+ auto-atualizável, histórico de episódios ("Já Visto"), troca de temporada e sincronização em nuvem + backup JSON gratuito.
-            2. 💻 **`A2-Miguel-PC-Windows.zip`**: Contém **apenas 1 arquivo (`A2-Miguel-PC.bat`)**! Basta extrair e dar dois cliques que ele instala tudo automaticamente na pasta `Downloads\A2-Miguel-PC`, cria o atalho na Área de Trabalho, sobe o servidor local com AdBlock 70+ e abre a janela dedicada no PC.
+            1. 📱 **`A2-Miguel-TV.apk`**: Aplicativo completo focado em **Celular Android**, **Tablets** e **Smart TVs / TV Box** com busca ao vivo, catálogo completo (Filmes, Séries e Animes via AniChan), AdBlock 100+ auto-atualizável, Modo Convidado local, histórico de episódios ("Já Visto"), troca de temporada e sincronização em nuvem + backup JSON gratuito.
+            2. 💻 **`A2-Miguel-PC-Windows.zip`**: Contém **apenas 1 arquivo (`A2-Miguel-PC.bat`)**! Basta extrair e dar dois cliques que ele instala tudo automaticamente na pasta `Downloads\A2-Miguel-PC`, cria o atalho na Área de Trabalho, sobe o servidor local com AdBlock 100+ e abre a janela dedicada no PC.
 
             ---
 
             ### 🚀 Destaques da Atualização:
-            - 🛡️ **Motor AdBlock 70+ Auto-Atualizável**: Proteção contra popups, redirecionamentos, rastreadores e anúncios de apostas no Celular e no PC.
-            - 🔍 **Busca Rápida em Tempo Real + Histórico Recente**: Encontre qualquer filme ou série instantaneamente com filtros `Todos / Filmes / Séries`.
+            - 🛡️ **Motor AdBlock 100+ Auto-Atualizável & Sandbox Anti-Popup**: Proteção contra popups, popunders, `/xads.js`, ParkLogic, redirecionamentos, rastreadores e anúncios de apostas no Celular e no PC.
+            - 🔍 **Busca Rápida em Tempo Real + Histórico Recente**: Encontre filmes, séries e animes instantaneamente com filtros `Todos / Filmes / Séries / Animes`.
+            - ⛩️ **Animes de Volta (AniChan)**: Catálogo de animes em alta e busca integrada no Celular e no PC.
             - 📺 **Séries Completas no Player**: Troque de temporada, volte/avance episódios (`Ep Anterior` / `Próx Ep`), reinicie do início (`↺ Reiniciar`) e acompanhe o selo **✓ Já Visto**.
-            - 💾 **Dados Salvos Gratuitamente**: Nuvem Google no Android + Backup JSON portátil compatível entre Celular e PC.
+            - 💾 **Dados Salvos Gratuitamente**: Modo Convidado + Nuvem Google no Android + Backup JSON portátil compatível entre Celular e PC.
             - 📥 **Download & Edição (`Tecla D`) + Zoom (`Tecla Z`)**: Renomeie arquivos, escolha pasta e ajuste o enquadramento.
           files: release-output/*
           draft: false

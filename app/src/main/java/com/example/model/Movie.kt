@@ -4,7 +4,8 @@ data class Movie(
     val title: String,
     val coverUrl: String,
     val url: String,
-    val isSeries: Boolean = url.contains("/series/") || url.contains("/episodios/"),
+    val isAnime: Boolean = url.contains("anichan.to") || url.contains("/animes/"),
+    val isSeries: Boolean = url.contains("/series/") || url.contains("/episodios/") || url.contains("anichan.to") || url.contains("/animes/"),
     val genre: String = "Geral",
     val audio: String = "Dub/Leg",
     val year: String = ""
@@ -23,13 +24,13 @@ sealed class AppState {
 
     data class HomeLoaded(
         val allMovies: List<Movie> = emptyList(),
-        val currentTab: String = "Inicio", // "Inicio", "Filmes", "Series", "MeusTitulos"
+        val currentTab: String = "Inicio", // "Inicio", "Filmes", "Series", "Animes", "MeusTitulos"
         val searchResults: List<Movie> = emptyList(),
         val visibleCount: Int = 24,
         val isSearching: Boolean = false,
         val searchQuery: String = "",
         val isLoadingSearch: Boolean = false,
-        val selectedCategory: String = "Tudo", // "Tudo", "Filmes", "Séries", "Favoritos"
+        val selectedCategory: String = "Tudo", // "Tudo", "Filmes", "Séries", "Animes", "Favoritos", "Já Vistos"
         val watchHistory: List<WatchHistoryItem> = emptyList(),
         val recentSearches: List<String> = emptyList(),
         val isRefreshingCatalog: Boolean = false

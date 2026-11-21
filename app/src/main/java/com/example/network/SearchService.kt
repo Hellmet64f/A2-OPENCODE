@@ -3,12 +3,16 @@ package com.example.network
 import com.example.model.Episode
 import com.example.model.Movie
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 import okhttp3.FormBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import org.json.JSONArray
 import org.json.JSONObject
 import java.net.URLEncoder
+import java.text.Normalizer
 import java.util.concurrent.TimeUnit
 import java.util.regex.Pattern
 
@@ -31,7 +35,8 @@ data class SeriesPageMetadata(
 )
 
 object SearchService {
-    const val BASE_URL = "https://www.pobreflixtv.delivery"
+    const val BASE_URL = "https://www.pobreflixtv.codes"
+    const val ANICHAN_BASE_URL = "https://anichan.to"
     private const val USER_AGENT =
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
 
@@ -39,10 +44,13 @@ object SearchService {
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(15, TimeUnit.SECONDS)
         .followRedirects(true)
+        .followSslRedirects(true)
         .build()
 
     fun normalizeUrl(rawUrl: String): String {
-        val trimmed = rawUrl.trim().replace("pobreflixtv.city", "pobreflixtv.delivery")
+        val trimmed = rawUrl.trim()
+            .replace("pobreflixtv.city", "pobreflixtv.codes")
+            .replace("pobreflixtv.delivery", "pobreflixtv.codes")
         return when {
             trimmed.isBlank() -> ""
             trimmed.startsWith("http://") || trimmed.startsWith("https://") -> trimmed
@@ -50,6 +58,21 @@ object SearchService {
             trimmed.startsWith("/") -> "$BASE_URL$trimmed"
             else -> "$BASE_URL/$trimmed"
         }
+    }
+
+    internal fun slugifyTitle(title: String): String {
+        val normalized = Normalizer.normalize(title, Normalizer.Form.NFD)
+            .replace(Regex("\\p{InCombiningDiacriticalMarks}+"), "")
+            .lowercase()
+            .replace(Regex("[^a-z0-9]+"), "-")
+            .trim('-')
+        return normalized.ifBlank { "anime" }
+    }
+
+    private fun stripAccents(input: String): String {
+        return Normalizer.normalize(input, Normalizer.Form.NFD)
+            .replace(Regex("\\p{InCombiningDiacriticalMarks}+"), "")
+            .trim()
     }
 
     private fun cleanHtmlText(raw: String): String {
@@ -81,56 +104,166 @@ object SearchService {
         emptyList()
     }
 
-    suspend fun searchPobreflix(query: String): List<Movie> = withContext(Dispatchers.IO) {
-        val cleanQuery = query.trim()
-        if (cleanQuery.isBlank()) return@withContext emptyList()
+    suspend fun fetchAniChanCatalog(): List<Movie> = withContext(Dispatchers.IO) {
         val combined = mutableListOf<Movie>()
-
-        // 1. Endpoint AJAX oficial de busca
-        try {
-            val url = "$BASE_URL/index.php?app=videobox&module=video&controller=index&do=buscarContent"
-            val formBody = FormBody.Builder()
-                .add("q", cleanQuery)
-                .build()
-            val request = Request.Builder()
-                .url(url)
-                .post(formBody)
-                .addHeader("User-Agent", USER_AGENT)
-                .addHeader("X-Requested-With", "XMLHttpRequest")
-                .addHeader("Origin", BASE_URL)
-                .addHeader("Referer", "$BASE_URL/buscar/")
-                .build()
-
-            client.newCall(request).execute().use { response ->
-                val jsonString = response.body?.string().orEmpty()
-                if (jsonString.isNotBlank()) {
-                    val json = JSONObject(jsonString)
-                    val html = json.optString("html", "")
-                    if (html.isNotBlank()) {
-                        combined.addAll(parseCardsFromHtml(html))
-                    }
-                }
-            }
-        } catch (_: Exception) {}
-
-        // 2. Fallback para página HTML de busca caso AJAX retorne vazio
-        if (combined.isEmpty()) {
+        val endpoints = listOf(
+            "$ANICHAN_BASE_URL/api/catalog/airing",
+            "$ANICHAN_BASE_URL/api/catalog/trending"
+        )
+        for (ep in endpoints) {
             try {
-                val encoded = URLEncoder.encode(cleanQuery, "UTF-8")
                 val request = Request.Builder()
-                    .url("$BASE_URL/buscar/?q=$encoded")
+                    .url(ep)
                     .get()
                     .addHeader("User-Agent", USER_AGENT)
+                    .addHeader("Accept", "application/json")
+                    .addHeader("Referer", "$ANICHAN_BASE_URL/")
                     .build()
                 client.newCall(request).execute().use { resp ->
-                    val html = resp.body?.string().orEmpty()
-                    if (html.isNotBlank()) {
-                        combined.addAll(parseCardsFromHtml(html))
+                    val body = resp.body?.string().orEmpty()
+                    if (body.isNotBlank()) {
+                        combined.addAll(parseAniChanResultsJson(body))
                     }
                 }
             } catch (_: Exception) {}
         }
+        combined.distinctBy { it.url }
+    }
 
+    suspend fun searchAniChan(query: String): List<Movie> = withContext(Dispatchers.IO) {
+        val cleanQuery = query.trim()
+        if (cleanQuery.isBlank()) return@withContext emptyList()
+        try {
+            val encoded = URLEncoder.encode(cleanQuery, "UTF-8")
+            val request = Request.Builder()
+                .url("$ANICHAN_BASE_URL/api/search?q=$encoded")
+                .get()
+                .addHeader("User-Agent", USER_AGENT)
+                .addHeader("Accept", "application/json")
+                .addHeader("Referer", "$ANICHAN_BASE_URL/search?q=$encoded")
+                .build()
+            client.newCall(request).execute().use { resp ->
+                val body = resp.body?.string().orEmpty()
+                if (body.isNotBlank()) {
+                    return@withContext parseAniChanResultsJson(body)
+                }
+            }
+        } catch (_: Exception) {}
+        emptyList()
+    }
+
+    internal fun parseAniChanResultsJson(jsonString: String): List<Movie> {
+        val results = mutableListOf<Movie>()
+        try {
+            val root = JSONObject(jsonString)
+            val arr = root.optJSONArray("results") ?: JSONArray()
+            for (i in 0 until arr.length()) {
+                val obj = arr.optJSONObject(i) ?: continue
+                val id = obj.optInt("id", 0)
+                if (id <= 0) continue
+                val title = obj.optString("title", "")
+                    .ifBlank { obj.optString("titleRomaji", "") }
+                    .ifBlank { "Anime #$id" }
+                val poster = obj.optString("poster", "")
+                if (poster.isBlank()) continue
+                val slug = slugifyTitle(title)
+                val year = obj.optJSONObject("startDate")?.optInt("year", 0)
+                    ?.takeIf { it > 1900 }?.toString() ?: ""
+                val url = "$ANICHAN_BASE_URL/anime/$id/$slug"
+                results.add(
+                    Movie(
+                        title = title,
+                        coverUrl = poster,
+                        url = url,
+                        isAnime = true,
+                        isSeries = true,
+                        genre = "Anime",
+                        audio = "Dub / Leg",
+                        year = year
+                    )
+                )
+            }
+        } catch (_: Exception) {}
+        return results.distinctBy { it.url }
+    }
+
+    suspend fun searchPobreflix(query: String): List<Movie> = withContext(Dispatchers.IO) {
+        val cleanQuery = query.trim()
+        if (cleanQuery.isBlank()) return@withContext emptyList()
+        val attempts = listOf(cleanQuery, stripAccents(cleanQuery))
+            .filter { it.isNotBlank() }
+            .distinct()
+
+        for (attempt in attempts) {
+            val combined = mutableListOf<Movie>()
+
+            // 1. Endpoint AJAX oficial no domínio ativo (pobreflixtv.codes)
+            try {
+                val url = "$BASE_URL/index.php?app=videobox&module=video&controller=index&do=buscarContent"
+                val formBody = FormBody.Builder()
+                    .add("q", attempt)
+                    .build()
+                val request = Request.Builder()
+                    .url(url)
+                    .post(formBody)
+                    .addHeader("User-Agent", USER_AGENT)
+                    .addHeader("X-Requested-With", "XMLHttpRequest")
+                    .addHeader("Origin", BASE_URL)
+                    .addHeader("Referer", "$BASE_URL/buscar/")
+                    .build()
+
+                client.newCall(request).execute().use { response ->
+                    val jsonString = response.body?.string().orEmpty()
+                    if (jsonString.isNotBlank() && jsonString.trimStart().startsWith("{")) {
+                        val json = JSONObject(jsonString)
+                        val html = json.optString("html", "")
+                        if (html.isNotBlank()) {
+                            combined.addAll(parseCardsFromHtml(html))
+                        }
+                    }
+                }
+            } catch (_: Exception) {}
+
+            // 2. Fallback HTML caso o site retorne página estática
+            if (combined.isEmpty()) {
+                try {
+                    val encoded = URLEncoder.encode(attempt, "UTF-8")
+                    val request = Request.Builder()
+                        .url("$BASE_URL/buscar/?q=$encoded")
+                        .get()
+                        .addHeader("User-Agent", USER_AGENT)
+                        .build()
+                    client.newCall(request).execute().use { resp ->
+                        val html = resp.body?.string().orEmpty()
+                        if (html.isNotBlank()) {
+                            combined.addAll(parseCardsFromHtml(html))
+                        }
+                    }
+                } catch (_: Exception) {}
+            }
+
+            if (combined.isNotEmpty()) {
+                return@withContext combined.distinctBy { it.url }
+            }
+        }
+        emptyList()
+    }
+
+    suspend fun searchAll(query: String): List<Movie> = coroutineScope {
+        val clean = query.trim()
+        if (clean.isBlank()) return@coroutineScope emptyList()
+        val pfDeferred = async { searchPobreflix(clean) }
+        val aniDeferred = async { searchAniChan(clean) }
+        val pfResults = pfDeferred.await()
+        val aniResults = aniDeferred.await()
+
+        // Intercala resultados de Filmes/Séries e Animes priorizando correspondência exata
+        val combined = mutableListOf<Movie>()
+        val maxSize = maxOf(pfResults.size, aniResults.size)
+        for (i in 0 until maxSize) {
+            if (i < pfResults.size) combined.add(pfResults[i])
+            if (i < aniResults.size) combined.add(aniResults[i])
+        }
         combined.distinctBy { it.url }
     }
 
@@ -149,7 +282,7 @@ object SearchService {
             val rawHref = matcher.group(1) ?: continue
             val content = matcher.group(2) ?: ""
             val href = normalizeUrl(rawHref)
-            if (!(href.contains("/filmes/") || href.contains("/series/") || href.contains("/episodios/"))) {
+            if (!(href.contains("/filmes/") || href.contains("/series/") || href.contains("/episodios/") || href.contains("/animes/"))) {
                 continue
             }
 
@@ -169,6 +302,8 @@ object SearchService {
                 val title = cleanHtmlText(rawTitle).ifBlank { "Sem Título" }
                 val yearMatch = yearPattern.matcher(content)
                 val year = if (yearMatch.find()) yearMatch.group(1).orEmpty() else ""
+                val isAnimeItem = href.contains("/animes/")
+                val isSeriesItem = isAnimeItem || href.contains("/series/") || href.contains("/episodios/")
 
                 if (results.none { it.url == href }) {
                     results.add(
@@ -176,7 +311,9 @@ object SearchService {
                             title = title,
                             coverUrl = cover,
                             url = href,
-                            isSeries = href.contains("/series/") || href.contains("/episodios/"),
+                            isAnime = isAnimeItem,
+                            isSeries = isSeriesItem,
+                            genre = if (isAnimeItem) "Anime" else "Geral",
                             year = year
                         )
                     )
@@ -189,6 +326,11 @@ object SearchService {
     suspend fun fetchSeriesMetadata(seriesUrl: String): SeriesPageMetadata? = withContext(Dispatchers.IO) {
         val cleanUrl = normalizeUrl(seriesUrl)
         if (cleanUrl.isBlank()) return@withContext null
+
+        if (cleanUrl.contains("anichan.to")) {
+            return@withContext fetchAniChanSeriesMetadata(cleanUrl)
+        }
+
         try {
             val request = Request.Builder()
                 .url(cleanUrl)
@@ -203,6 +345,67 @@ object SearchService {
             }
         } catch (_: Exception) {}
         null
+    }
+
+    internal fun parseAniChanEpisodesMetadata(
+        animeId: Int,
+        slug: String,
+        episodesJson: String
+    ): SeriesPageMetadata {
+        val json = JSONObject(episodesJson)
+        val count = json.optInt("episodes", 1).coerceIn(1, 2000)
+        val dubAvailable = json.optBoolean("dubAvailable", false)
+        val audioLabel = if (dubAvailable) "Dublado / Legendado" else "Legendado"
+        val eps = (1..count).map { epNum ->
+            Episode(
+                title = "Episódio $epNum",
+                url = "$ANICHAN_BASE_URL/anime/$animeId/$slug/$epNum",
+                season = 1,
+                number = epNum,
+                audio = audioLabel
+            )
+        }
+        return SeriesPageMetadata(
+            videoId = "anichan_$animeId",
+            availableSeasons = listOf(1),
+            fallbackEpisodes = eps
+        )
+    }
+
+    private suspend fun fetchAniChanSeriesMetadata(animeUrl: String): SeriesPageMetadata? = withContext(Dispatchers.IO) {
+        val match = Regex("""anichan\.to/anime/(\d+)(?:/([^/?#]+))?""").find(animeUrl) ?: return@withContext null
+        val animeId = match.groupValues[1].toIntOrNull() ?: return@withContext null
+        val slug = match.groupValues[2].ifBlank { "anime" }
+        try {
+            val req = Request.Builder()
+                .url("$ANICHAN_BASE_URL/api/watch/episodes?anilistId=$animeId")
+                .get()
+                .addHeader("User-Agent", USER_AGENT)
+                .addHeader("Accept", "application/json")
+                .addHeader("Referer", animeUrl)
+                .build()
+            client.newCall(req).execute().use { resp ->
+                val body = resp.body?.string().orEmpty()
+                if (body.isNotBlank()) {
+                    return@withContext parseAniChanEpisodesMetadata(animeId, slug, body)
+                }
+            }
+        } catch (_: Exception) {}
+
+        // Fallback direto com Episódio 1
+        SeriesPageMetadata(
+            videoId = "anichan_$animeId",
+            availableSeasons = listOf(1),
+            fallbackEpisodes = listOf(
+                Episode(
+                    title = "Episódio 1",
+                    url = "$ANICHAN_BASE_URL/anime/$animeId/$slug/1",
+                    season = 1,
+                    number = 1,
+                    audio = "Dub / Leg"
+                )
+            )
+        )
     }
 
     internal fun parseSeriesMetadataFromHtml(html: String): SeriesPageMetadata {
@@ -241,7 +444,7 @@ object SearchService {
         season: Int,
         audio: String = "Dublado"
     ): List<Episode> = withContext(Dispatchers.IO) {
-        if (videoId.isBlank()) return@withContext emptyList()
+        if (videoId.isBlank() || videoId.startsWith("anichan_")) return@withContext emptyList()
         try {
             val safeAudio = if (audio.equals("Legendado", ignoreCase = true)) "Legendado" else "Dublado"
             val url = "$BASE_URL/index.php?app=videobox&module=video&controller=view&do=episodesList&id=${URLEncoder.encode(videoId, "UTF-8")}&season=$season&audio=$safeAudio"
@@ -323,8 +526,14 @@ object SearchService {
                 val map = mutableMapOf<String, String>()
                 raw.replace("&amp;", "&").split("&").forEach { pair ->
                     val parts = pair.split("=", limit = 2)
-                    if (parts.size == 2 && parts[1].isNotBlank()) {
-                        map[parts[0].lowercase().trim()] = parts[1].trim()
+                    val valToken = parts.getOrNull(1)?.trim().orEmpty()
+                    if (parts.size == 2 &&
+                        valToken.isNotBlank() &&
+                        !valToken.equals("hide", ignoreCase = true) &&
+                        !valToken.equals("null", ignoreCase = true) &&
+                        !valToken.equals("none", ignoreCase = true)
+                    ) {
+                        map[parts[0].lowercase().trim()] = valToken
                     }
                 }
                 return map
@@ -342,13 +551,16 @@ object SearchService {
                     val baseUrl = p.optString("url", "")
                     val token = sourceMap[key]
                     if (!token.isNullOrBlank() && baseUrl.isNotBlank()) {
-                        servers.add(
-                            PlayerServer(
-                                name = "$label ($audioLabel)",
-                                embedUrl = baseUrl + token,
-                                audio = audioLabel
+                        val embed = baseUrl + token
+                        if (!AdBlockManager.isBlockedUrl(embed)) {
+                            servers.add(
+                                PlayerServer(
+                                    name = "$label ($audioLabel)",
+                                    embedUrl = embed,
+                                    audio = audioLabel
+                                )
                             )
-                        )
+                        }
                     }
                 }
             }

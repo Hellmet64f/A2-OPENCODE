@@ -607,6 +607,12 @@ body {
     font-weight: 800;
 }
 
+.card-pill-anime {
+    background: rgba(245, 197, 24, 0.92);
+    color: #11131a;
+    border-color: rgba(245, 197, 24, 1);
+}
+
 .card-pill-watched {
     background: rgba(16, 185, 129, 0.92);
     color: #06281c;

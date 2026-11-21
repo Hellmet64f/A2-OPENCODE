@@ -25,23 +25,29 @@ foreach ($d in @($AppDir, $DataDir, $VideosDir, $FilmesDir, $SeriesDir)) {
     }
 }
 
-$Script:BaseUrl = "https://www.pobreflixtv.delivery"
+$Script:BaseUrl = "https://www.pobreflixtv.codes"
+$Script:AniChanBaseUrl = "https://anichan.to"
 $Script:UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
 
 $Script:BaselineAdRules = @(
     "googlesyndication.com", "doubleclick.net", "googleadservices.com", "google-analytics.com",
     "googletagmanager.com", "adservice.google.com", "pagead2.googlesyndication.com", "popads.net",
-    "popcash.net", "propellerads.com", "propellerclick.com", "onclickads.net", "exoclick.com",
+    "popcash.net", "propellerads.com", "propellerclick.com", "onclickads.net", "onclickalgo.com", "exoclick.com",
     "exosrv.com", "realsrv.com", "syndication.realsrv.com", "adsterra.com", "highperformanceformat.com",
-    "effectivegatecpm.com", "monetag.com", "al5sm.com", "trafficjunky.net", "trafficfactory.biz",
+    "effectivegatecpm.com", "monetag.com", "al5sm.com", "trafficjunky.net", "trafficfactory.biz", "trafficstars.com",
     "adcash.com", "acscdn.com", "yllix.com", "taboola.com", "outbrain.com", "mgid.com",
     "revcontent.com", "juicyads.com", "plugrush.com", "hilltopads.net", "richads.com", "clickadu.com",
-    "admaven.com", "bidvertiser.com", "infolinks.com", "criteo.com", "criteo.net", "pubmatic.com",
+    "clickaine.com", "clksite.com", "admaven.com", "bidvertiser.com", "infolinks.com", "criteo.com", "criteo.net", "pubmatic.com",
     "rubiconproject.com", "openx.net", "appnexus.com", "adnxs.com", "smartadserver.com",
-    "mediavine.com", "adthrive.com", "1xbet", "bet365", "betano", "blaze.com", "sportingbet",
-    "pixbet", "estrelabet", "cassino", "casino", "aposta", "tigrinho", "fortune-tiger",
-    "oldnessdernly.qpon", "parklogic.com", "pushwoosh.com", "onesignal.com", "hotjar.com",
-    "histats.com", "amung.us", "whos.amung.us", "adf.ly", "ouo.io", "shorte.st", "linkvertise.com"
+    "mediavine.com", "adthrive.com", "tsyndicate.com", "bnmla.com", "rtmark.net",
+    "soakysecrets.com", "mdstats.info", "adtelligent.com", "ero-advertising.com",
+    "1xbet", "bet365", "betano", "blaze.com", "sportingbet",
+    "pixbet", "estrelabet", "bet7k", "superbet", "kto.com", "novibet", "rivalo", "parimatch",
+    "bodog", "1win", "pin-up", "brazino", "cassino", "casino", "aposta", "tigrinho", "fortune-tiger",
+    "oldnessdernly.qpon", "parklogic.com", "sedoparking.com", "parkingcrew.net", "bodis.com",
+    "pushwoosh.com", "onesignal.com", "hotjar.com", "histats.com", "amung.us", "whos.amung.us",
+    "adf.ly", "ouo.io", "shorte.st", "linkvertise.com", "chaturbate.com", "stripchat.com",
+    "livejasmin.com", "xads.js", "popunder"
 )
 
 $Script:AdRules = New-Object System.Collections.Generic.HashSet[string]
@@ -86,7 +92,7 @@ function Update-AdBlockRules {
                     $dom = $parts[0].TrimStart("|").Split("^")[0]
                 }
                 if ($dom -and $dom -ne "localhost" -and $dom.Contains(".") -and $dom.Length -ge 4 -and $dom.Length -le 100) {
-                    if ($dom -notmatch "pobreflixtv|tmdb\.org|byse|mixdrop|streamtape|googleapis|gstatic") {
+                    if ($dom -notmatch "pobreflixtv|anichan|anilist|tmdb\.org|byse|mixdrop|mxdrop|streamtape|playmogo|googleapis|gstatic") {
                         if ($Script:AdRules.Add($dom)) {
                             [void]$added.Add($dom)
                         }
@@ -110,11 +116,30 @@ if (-not (Test-Path $AdBlockFile)) {
 
 function Normalize-MediaUrl([string]$raw) {
     if ([string]::IsNullOrWhiteSpace($raw)) { return "" }
-    $t = $raw.Trim().Replace("pobreflixtv.city", "pobreflixtv.delivery")
+    $t = $raw.Trim().Replace("pobreflixtv.city", "pobreflixtv.codes").Replace("pobreflixtv.delivery", "pobreflixtv.codes")
     if ($t.StartsWith("http://") -or $t.StartsWith("https://")) { return $t }
     if ($t.StartsWith("//")) { return "https:$t" }
     if ($t.StartsWith("/")) { return "$($Script:BaseUrl)$t" }
     return "$($Script:BaseUrl)/$t"
+}
+
+function Strip-Accents([string]$text) {
+    if ([string]::IsNullOrWhiteSpace($text)) { return "" }
+    $norm = $text.Normalize([System.Text.NormalizationForm]::FormD)
+    $sb = New-Object System.Text.StringBuilder
+    foreach ($c in $norm.ToCharArray()) {
+        if ([System.Globalization.CharUnicodeInfo]::GetUnicodeCategory($c) -ne [System.Globalization.UnicodeCategory]::NonSpacingMark) {
+            [void]$sb.Append($c)
+        }
+    }
+    return $sb.ToString().Normalize([System.Text.NormalizationForm]::FormC).Trim()
+}
+
+function Slugify-Title([string]$text) {
+    $clean = (Strip-Accents $text).ToLowerInvariant()
+    $slug = [System.Text.RegularExpressions.Regex]::Replace($clean, '[^a-z0-9]+', '-').Trim('-')
+    if ([string]::IsNullOrWhiteSpace($slug)) { return "anime" }
+    return $slug
 }
 
 function Clean-HtmlText([string]$raw) {
@@ -173,7 +198,7 @@ function Parse-CardsFromHtml([string]$html) {
     $linkMatches = [System.Text.RegularExpressions.Regex]::Matches($html, '<a[^>]+href=["'']([^"'']+)["''][^>]*>(.*?)</a>', [System.Text.RegularExpressions.RegexOptions]::Singleline -bor [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
     foreach ($m in $linkMatches) {
         $href = Normalize-MediaUrl $m.Groups[1].Value
-        if (-not ($href.Contains("/filmes/") -or $href.Contains("/series/") -or $href.Contains("/episodios/"))) { continue }
+        if (-not ($href.Contains("/filmes/") -or $href.Contains("/series/") -or $href.Contains("/episodios/") -or $href.Contains("/animes/"))) { continue }
         $inner = $m.Groups[2].Value
         $imgM = [System.Text.RegularExpressions.Regex]::Match($inner, '<img[^>]+(?:src|data-src|data-lazy-src)=["'']([^"'']+)["'']', [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
         if (-not $imgM.Success) { continue }
@@ -191,17 +216,53 @@ function Parse-CardsFromHtml([string]$html) {
 
         $yearM = [System.Text.RegularExpressions.Regex]::Match($inner, '\b(19\d{2}|20\d{2})\b')
         $year = if ($yearM.Success) { $yearM.Groups[1].Value } else { "" }
+        $isAnime = $href.Contains("/animes/")
 
         if ($seen.Add($href)) {
             [void]$list.Add(@{
                 title = $title
                 cover = $cover
                 url = $href
-                isSeries = ($href.Contains("/series/") -or $href.Contains("/episodios/"))
+                isAnime = $isAnime
+                isSeries = ($isAnime -or $href.Contains("/series/") -or $href.Contains("/episodios/"))
                 year = $year
             })
         }
     }
+    return $list.ToArray()
+}
+
+function Parse-AniChanResults([string]$rawJson) {
+    $list = New-Object System.Collections.Generic.List[object]
+    $seen = New-Object System.Collections.Generic.HashSet[string]
+    if ([string]::IsNullOrWhiteSpace($rawJson)) { return @() }
+    try {
+        $parsed = $rawJson | ConvertFrom-Json
+        if (-not $parsed -or -not $parsed.results) { return @() }
+        foreach ($r in $parsed.results) {
+            $id = [int]$r.id
+            if ($id -le 0) { continue }
+            $title = [string]$r.title
+            if ([string]::IsNullOrWhiteSpace($title)) { $title = [string]$r.titleRomaji }
+            if ([string]::IsNullOrWhiteSpace($title)) { $title = "Anime #$id" }
+            $poster = [string]$r.poster
+            if ([string]::IsNullOrWhiteSpace($poster)) { continue }
+            $slug = Slugify-Title $title
+            $url = "$($Script:AniChanBaseUrl)/anime/$id/$slug"
+            $year = ""
+            if ($r.startDate -and $r.startDate.year) { $year = [string]$r.startDate.year }
+            if ($seen.Add($url)) {
+                [void]$list.Add(@{
+                    title = $title
+                    cover = $poster
+                    url = $url
+                    isAnime = $true
+                    isSeries = $true
+                    year = $year
+                })
+            }
+        }
+    } catch {}
     return $list.ToArray()
 }
 
@@ -308,41 +369,85 @@ while ($listener.IsListening) {
             $page = 1
             if ($query["page"]) { [void][int]::TryParse($query["page"], [ref]$page) }
             if ($page -lt 1) { $page = 1 }
-            $targetUrl = "$($Script:BaseUrl)/"
-            if ($cat -eq "filmes") {
-                $targetUrl = if ($page -gt 1) { "$($Script:BaseUrl)/filmes/page/$page/" } else { "$($Script:BaseUrl)/filmes/" }
-            } elseif ($cat -eq "series") {
-                $targetUrl = if ($page -gt 1) { "$($Script:BaseUrl)/series/page/$page/" } else { "$($Script:BaseUrl)/series/" }
-            }
-            $items = @()
-            try {
-                $html = Fetch-WebText $targetUrl $Script:BaseUrl
-                $items = Parse-CardsFromHtml $html
-            } catch {}
-            Send-JsonResponse $ctx @{ items = $items; page = $page; category = $cat }
-        }
-        elseif ($path -eq "/api/search") {
-            $q = ($query["q"] | Out-String).Trim()
-            $items = @()
-            if ($q) {
+            $itemsList = New-Object System.Collections.Generic.List[object]
+            $seenUrls = New-Object System.Collections.Generic.HashSet[string]
+
+            if ($cat -eq "animes") {
+                foreach ($ep in @("$($Script:AniChanBaseUrl)/api/catalog/airing", "$($Script:AniChanBaseUrl)/api/catalog/trending")) {
+                    try {
+                        $rawAni = Fetch-WebText $ep "$($Script:AniChanBaseUrl)/"
+                        foreach ($it in (Parse-AniChanResults $rawAni)) {
+                            if ($seenUrls.Add([string]$it.url)) { [void]$itemsList.Add($it) }
+                        }
+                    } catch {}
+                }
+            } else {
+                $targetUrl = "$($Script:BaseUrl)/"
+                if ($cat -eq "filmes") {
+                    $targetUrl = if ($page -gt 1) { "$($Script:BaseUrl)/filmes/page/$page/" } else { "$($Script:BaseUrl)/filmes/" }
+                } elseif ($cat -eq "series") {
+                    $targetUrl = if ($page -gt 1) { "$($Script:BaseUrl)/series/page/$page/" } else { "$($Script:BaseUrl)/series/" }
+                }
                 try {
-                    $ajaxUrl = "$($Script:BaseUrl)/index.php?app=videobox&module=video&controller=index&do=buscarContent"
-                    $encQ = [System.Uri]::EscapeDataString($q)
-                    $rawResp = Post-FormText $ajaxUrl "q=$encQ" "$($Script:BaseUrl)/buscar/"
-                    $parsed = $rawResp | ConvertFrom-Json
-                    if ($parsed -and $parsed.html) {
-                        $items = Parse-CardsFromHtml $parsed.html
+                    $html = Fetch-WebText $targetUrl $Script:BaseUrl
+                    foreach ($it in (Parse-CardsFromHtml $html)) {
+                        if ($seenUrls.Add([string]$it.url)) { [void]$itemsList.Add($it) }
                     }
                 } catch {}
-                if ($items.Length -eq 0) {
+
+                if ($cat -eq "home" -and $page -eq 1) {
                     try {
-                        $encQ = [System.Uri]::EscapeDataString($q)
-                        $html = Fetch-WebText "$($Script:BaseUrl)/buscar/?q=$encQ" $Script:BaseUrl
-                        $items = Parse-CardsFromHtml $html
+                        $rawAni = Fetch-WebText "$($Script:AniChanBaseUrl)/api/catalog/trending" "$($Script:AniChanBaseUrl)/"
+                        foreach ($it in (Parse-AniChanResults $rawAni)) {
+                            if ($seenUrls.Add([string]$it.url)) { [void]$itemsList.Add($it) }
+                        }
                     } catch {}
                 }
             }
-            Send-JsonResponse $ctx @{ items = $items; query = $q }
+            Send-JsonResponse $ctx @{ items = $itemsList.ToArray(); page = $page; category = $cat }
+        }
+        elseif ($path -eq "/api/search") {
+            $q = ($query["q"] | Out-String).Trim()
+            $pfItems = @()
+            $aniItems = @()
+            if ($q) {
+                $qNoAccents = Strip-Accents $q
+                $attempts = if ($qNoAccents -and $qNoAccents -ne $q) { @($q, $qNoAccents) } else { @($q) }
+                foreach ($att in $attempts) {
+                    try {
+                        $ajaxUrl = "$($Script:BaseUrl)/index.php?app=videobox&module=video&controller=index&do=buscarContent"
+                        $encQ = [System.Uri]::EscapeDataString($att)
+                        $rawResp = Post-FormText $ajaxUrl "q=$encQ" "$($Script:BaseUrl)/buscar/"
+                        $parsed = $rawResp | ConvertFrom-Json
+                        if ($parsed -and $parsed.html) {
+                            $pfItems = Parse-CardsFromHtml $parsed.html
+                        }
+                    } catch {}
+                    if ($pfItems.Length -eq 0) {
+                        try {
+                            $encQ = [System.Uri]::EscapeDataString($att)
+                            $html = Fetch-WebText "$($Script:BaseUrl)/buscar/?q=$encQ" $Script:BaseUrl
+                            $pfItems = Parse-CardsFromHtml $html
+                        } catch {}
+                    }
+                    if ($pfItems.Length -gt 0) { break }
+                }
+
+                try {
+                    $encAniQ = [System.Uri]::EscapeDataString($q)
+                    $rawAni = Fetch-WebText "$($Script:AniChanBaseUrl)/api/search?q=$encAniQ" "$($Script:AniChanBaseUrl)/"
+                    $aniItems = Parse-AniChanResults $rawAni
+                } catch {}
+            }
+
+            $combined = New-Object System.Collections.Generic.List[object]
+            $seenSearch = New-Object System.Collections.Generic.HashSet[string]
+            $maxCount = [Math]::Max($pfItems.Length, $aniItems.Length)
+            for ($i = 0; $i -lt $maxCount; $i++) {
+                if ($i -lt $pfItems.Length -and $seenSearch.Add([string]$pfItems[$i].url)) { [void]$combined.Add($pfItems[$i]) }
+                if ($i -lt $aniItems.Length -and $seenSearch.Add([string]$aniItems[$i].url)) { [void]$combined.Add($aniItems[$i]) }
+            }
+            Send-JsonResponse $ctx @{ items = $combined.ToArray(); query = $q }
         }
         elseif ($path -eq "/api/series") {
             $targetUrl = Normalize-MediaUrl $query["url"]
@@ -350,38 +455,67 @@ while ($listener.IsListening) {
             $seasons = New-Object System.Collections.Generic.SortedSet[int]
             $fallbackEps = New-Object System.Collections.Generic.List[object]
             $synopsis = ""
-            try {
-                $html = Fetch-WebText $targetUrl $Script:BaseUrl
-                $vidM = [System.Text.RegularExpressions.Regex]::Match($html, 'data-video-id=["''](\d+)["'']')
-                if ($vidM.Success) { $videoId = $vidM.Groups[1].Value }
-                $sMatches = [System.Text.RegularExpressions.Regex]::Matches($html, 'data-season=["''](\d+)["'']')
-                foreach ($sm in $sMatches) {
-                    $num = [int]$sm.Groups[1].Value
-                    if ($num -ge 1 -and $num -le 200) { [void]$seasons.Add($num) }
-                }
-                if ($seasons.Count -eq 0) { [void]$seasons.Add(1) }
 
-                $synM = [System.Text.RegularExpressions.Regex]::Match($html, '<meta[^>]+name=["'']description["''][^>]+content=["'']([^"'']+)["'']', [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
-                if ($synM.Success) { $synopsis = Clean-HtmlText $synM.Groups[1].Value }
-
-                $epMatches = [System.Text.RegularExpressions.Regex]::Matches($html, '<a[^>]+href=["'']([^"'']*/episodios/[^"'']+)["''][^>]*>(.*?)</a>', [System.Text.RegularExpressions.RegexOptions]::Singleline -bor [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
-                $epSeen = New-Object System.Collections.Generic.HashSet[string]
-                $idx = 1
-                foreach ($em in $epMatches) {
-                    $epUrl = Normalize-MediaUrl $em.Groups[1].Value
-                    if (-not $epSeen.Add($epUrl)) { continue }
-                    $seM = [System.Text.RegularExpressions.Regex]::Match($epUrl, '-(\d+)x(\d+)-')
-                    $sNum = if ($seM.Success) { [int]$seM.Groups[1].Value } else { 1 }
-                    $eNum = if ($seM.Success) { [int]$seM.Groups[2].Value } else { $idx }
-                    [void]$fallbackEps.Add(@{
-                        title = Clean-HtmlText $em.Groups[2].Value
-                        url = $epUrl
-                        season = $sNum
-                        number = $eNum
-                    })
-                    $idx++
+            if ($targetUrl.Contains("anichan.to")) {
+                $aniMatch = [System.Text.RegularExpressions.Regex]::Match($targetUrl, 'anichan\.to/anime/(\d+)(?:/([^/?#]+))?')
+                if ($aniMatch.Success) {
+                    $aniId = $aniMatch.Groups[1].Value
+                    $slug = if ($aniMatch.Groups[2].Success -and $aniMatch.Groups[2].Value) { $aniMatch.Groups[2].Value } else { "anime" }
+                    $videoId = "anichan_$aniId"
+                    [void]$seasons.Add(1)
+                    $epCount = 1
+                    $dubAvail = $false
+                    try {
+                        $rawMeta = Fetch-WebText "$($Script:AniChanBaseUrl)/api/watch/episodes?anilistId=$aniId" $targetUrl
+                        $metaObj = $rawMeta | ConvertFrom-Json
+                        if ($metaObj -and $metaObj.episodes) { $epCount = [Math]::Max(1, [Math]::Min(2000, [int]$metaObj.episodes)) }
+                        if ($metaObj -and $metaObj.dubAvailable) { $dubAvail = [bool]$metaObj.dubAvailable }
+                    } catch {}
+                    $synopsis = if ($dubAvail) { "Anime disponível no AniChan com opções Dublado e Legendado sem anúncios." } else { "Anime disponível no AniChan em Alta Definição sem anúncios." }
+                    for ($eIdx = 1; $eIdx -le $epCount; $eIdx++) {
+                        [void]$fallbackEps.Add(@{
+                            title = "Episódio $eIdx"
+                            url = "$($Script:AniChanBaseUrl)/anime/$aniId/$slug/$eIdx"
+                            season = 1
+                            number = $eIdx
+                            audio = if ($dubAvail) { "Dublado / Legendado" } else { "Legendado" }
+                        })
+                    }
                 }
-            } catch {}
+            } else {
+                try {
+                    $html = Fetch-WebText $targetUrl $Script:BaseUrl
+                    $vidM = [System.Text.RegularExpressions.Regex]::Match($html, 'data-video-id=["''](\d+)["'']')
+                    if ($vidM.Success) { $videoId = $vidM.Groups[1].Value }
+                    $sMatches = [System.Text.RegularExpressions.Regex]::Matches($html, 'data-season=["''](\d+)["'']')
+                    foreach ($sm in $sMatches) {
+                        $num = [int]$sm.Groups[1].Value
+                        if ($num -ge 1 -and $num -le 200) { [void]$seasons.Add($num) }
+                    }
+                    if ($seasons.Count -eq 0) { [void]$seasons.Add(1) }
+
+                    $synM = [System.Text.RegularExpressions.Regex]::Match($html, '<meta[^>]+name=["'']description["''][^>]+content=["'']([^"'']+)["'']', [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
+                    if ($synM.Success) { $synopsis = Clean-HtmlText $synM.Groups[1].Value }
+
+                    $epMatches = [System.Text.RegularExpressions.Regex]::Matches($html, '<a[^>]+href=["'']([^"'']*/episodios/[^"'']+)["''][^>]*>(.*?)</a>', [System.Text.RegularExpressions.RegexOptions]::Singleline -bor [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
+                    $epSeen = New-Object System.Collections.Generic.HashSet[string]
+                    $idx = 1
+                    foreach ($em in $epMatches) {
+                        $epUrl = Normalize-MediaUrl $em.Groups[1].Value
+                        if (-not $epSeen.Add($epUrl)) { continue }
+                        $seM = [System.Text.RegularExpressions.Regex]::Match($epUrl, '-(\d+)x(\d+)-')
+                        $sNum = if ($seM.Success) { [int]$seM.Groups[1].Value } else { 1 }
+                        $eNum = if ($seM.Success) { [int]$seM.Groups[2].Value } else { $idx }
+                        [void]$fallbackEps.Add(@{
+                            title = Clean-HtmlText $em.Groups[2].Value
+                            url = $epUrl
+                            season = $sNum
+                            number = $eNum
+                        })
+                        $idx++
+                    }
+                } catch {}
+            }
             Send-JsonResponse $ctx @{
                 videoId = $videoId
                 seasons = @($seasons)
@@ -421,62 +555,87 @@ while ($listener.IsListening) {
         elseif ($path -eq "/api/player") {
             $targetUrl = Normalize-MediaUrl $query["url"]
             $vid = ($query["id"] | Out-String).Trim()
-            if (-not $vid -and $targetUrl) {
-                try {
-                    $pageHtml = Fetch-WebText $targetUrl $Script:BaseUrl
-                    $vidM = [System.Text.RegularExpressions.Regex]::Match($pageHtml, 'data-video-id=["''](\d+)["'']')
-                    if ($vidM.Success) { $vid = $vidM.Groups[1].Value }
-                } catch {}
-            }
-
             $servers = New-Object System.Collections.Generic.List[object]
             $nextUrl = $null
             $prevUrl = $null
 
-            if ($vid) {
-                try {
-                    $pdUrl = "$($Script:BaseUrl)/index.php?app=videobox&module=video&controller=view&do=playerData&id=$vid"
-                    $rawPd = Fetch-WebText $pdUrl $targetUrl
-                    $pd = $rawPd | ConvertFrom-Json
-                    if ($pd -and $pd.players) {
-                        $parseQueryPairs = {
-                            param([string]$qStr)
-                            $map = @{}
-                            if (-not $qStr) { return $map }
-                            $cleanQ = $qStr.Replace("&amp;", "&")
-                            foreach ($pair in ($cleanQ -split "&")) {
-                                $parts = $pair -split "=", 2
-                                if ($parts.Length -eq 2 -and $parts[1]) {
-                                    $map[$parts[0].ToLowerInvariant().Trim()] = $parts[1].Trim()
+            if ($targetUrl.Contains("anichan.to")) {
+                $vid = "anichan"
+                [void]$servers.Add(@{
+                    name = "AniChan HD (Player Direto)"
+                    embedUrl = $targetUrl
+                    audio = "Dub / Leg"
+                })
+            } else {
+                if (-not $vid -and $targetUrl) {
+                    try {
+                        $pageHtml = Fetch-WebText $targetUrl $Script:BaseUrl
+                        $vidM = [System.Text.RegularExpressions.Regex]::Match($pageHtml, 'data-video-id=["''](\d+)["'']')
+                        if ($vidM.Success) { $vid = $vidM.Groups[1].Value }
+                    } catch {}
+                }
+
+                if ($vid) {
+                    try {
+                        $pdUrl = "$($Script:BaseUrl)/index.php?app=videobox&module=video&controller=view&do=playerData&id=$vid"
+                        $rawPd = Fetch-WebText $pdUrl $targetUrl
+                        $pd = $rawPd | ConvertFrom-Json
+                        if ($pd -and $pd.players) {
+                            $parseQueryPairs = {
+                                param([string]$qStr)
+                                $map = @{}
+                                if (-not $qStr) { return $map }
+                                $cleanQ = $qStr.Replace("&amp;", "&")
+                                foreach ($pair in ($cleanQ -split "&")) {
+                                    $parts = $pair -split "=", 2
+                                    if ($parts.Length -eq 2 -and $parts[1]) {
+                                        $tok = $parts[1].Trim()
+                                        if ($tok -and $tok -notmatch '^(?i)(hide|null|none)$') {
+                                            $map[$parts[0].ToLowerInvariant().Trim()] = $tok
+                                        }
+                                    }
+                                }
+                                return $map
+                            }
+
+                            $dubMap = & $parseQueryPairs ([string]$pd.servers_dub)
+                            $legMap = & $parseQueryPairs ([string]$pd.servers_leg)
+                            $rawServers = New-Object System.Collections.Generic.List[object]
+
+                            foreach ($pairAudio in @(@{ map = $dubMap; label = "Dublado" }, @{ map = $legMap; label = "Legendado" })) {
+                                foreach ($p in $pd.players) {
+                                    $lbl = [string]$p.label
+                                    $key = ([System.Text.RegularExpressions.Regex]::Replace($lbl.ToLowerInvariant(), "[^a-z0-9]", ""))
+                                    $token = $pairAudio.map[$key]
+                                    if ($token -and $p.url) {
+                                        $embed = ([string]$p.url) + $token
+                                        $prio = if ($lbl -match "(?i)byse") { 0 } elseif ($lbl -match "(?i)mixdrop|mxdrop") { 1 } elseif ($lbl -match "(?i)streamtape") { 2 } elseif ($lbl -match "(?i)dood") { 10 } else { 5 }
+                                        $audioPrio = if ($pairAudio.label -eq "Dublado") { 0 } else { 1 }
+                                        [void]$rawServers.Add(@{
+                                            name = "$lbl ($($pairAudio.label))"
+                                            embedUrl = $embed
+                                            audio = $pairAudio.label
+                                            sortKey = ($audioPrio * 20) + $prio
+                                        })
+                                    }
                                 }
                             }
-                            return $map
-                        }
 
-                        $dubMap = & $parseQueryPairs ([string]$pd.servers_dub)
-                        $legMap = & $parseQueryPairs ([string]$pd.servers_leg)
+                            foreach ($s in ($rawServers | Sort-Object sortKey)) {
+                                [void]$servers.Add(@{
+                                    name = $s.name
+                                    embedUrl = $s.embedUrl
+                                    audio = $s.audio
+                                })
+                            }
 
-                        foreach ($pairAudio in @(@{ map = $dubMap; label = "Dublado" }, @{ map = $legMap; label = "Legendado" })) {
-                            foreach ($p in $pd.players) {
-                                $lbl = [string]$p.label
-                                $key = ([System.Text.RegularExpressions.Regex]::Replace($lbl.ToLowerInvariant(), "[^a-z0-9]", ""))
-                                $token = $pairAudio.map[$key]
-                                if ($token -and $p.url) {
-                                    [void]$servers.Add(@{
-                                        name = "$lbl ($($pairAudio.label))"
-                                        embedUrl = ([string]$p.url) + $token
-                                        audio = $pairAudio.label
-                                    })
-                                }
+                            if ($pd.navigation) {
+                                if ($pd.navigation.next) { $nextUrl = Normalize-MediaUrl ([string]$pd.navigation.next) }
+                                if ($pd.navigation.prev) { $prevUrl = Normalize-MediaUrl ([string]$pd.navigation.prev) }
                             }
                         }
-
-                        if ($pd.navigation) {
-                            if ($pd.navigation.next) { $nextUrl = Normalize-MediaUrl ([string]$pd.navigation.next) }
-                            if ($pd.navigation.prev) { $prevUrl = Normalize-MediaUrl ([string]$pd.navigation.prev) }
-                        }
-                    }
-                } catch {}
+                    } catch {}
+                }
             }
 
             Send-JsonResponse $ctx @{
@@ -495,26 +654,39 @@ while ($listener.IsListening) {
 
             $blocked = $false
             $lowerUrl = $targetUrl.ToLowerInvariant()
-            if (-not ($lowerUrl -match "pobreflixtv|byse|mixdrop|streamtape")) {
+            if (-not ($lowerUrl -match "pobreflixtv|anichan|byse|mixdrop|mxdrop|streamtape|playmogo")) {
                 foreach ($rule in $Script:AdRules) {
                     if ($lowerUrl.Contains($rule)) { $blocked = $true; break }
                 }
             }
             if ($blocked) {
                 $Script:BlockedCount++
-                Send-TextResponse $ctx "<html><body style='background:#000;color:#10b981;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh'>Bloqueado pelo AdBlock A2 Miguel</body></html>"
+                Send-TextResponse $ctx "<html><body style='background:#000;color:#10b981;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh'>🛡️ Bloqueado pelo AdBlock A2 Miguel</body></html>"
                 continue
             }
 
             try {
                 $html = Fetch-WebText $targetUrl $Script:BaseUrl
-                # Remove scripts de anúncios conhecidos e popup handlers
-                $html = [System.Text.RegularExpressions.Regex]::Replace($html, '<script[^>]+src=["''][^"'']*(googlesyndication|doubleclick|popads|popcash|adsterra|monetag|propeller|exoclick|parklogic|histats|amung\.us|taboola|outbrain|1xbet|betano|bet365|tigrinho)[^"'']*["''][^>]*>\s*</script>', '', [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
+                if ($html -match "(?i)parklogic\.com|This page has been created by ParkLogic|sedoparking") {
+                    $Script:BlockedCount++
+                    $parkSafe = @"
+<!DOCTYPE html><html><body style="background:#090a0f;color:#f5f7fc;font-family:sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;gap:10px;text-align:center;padding:24px;">
+<h3 style="color:#10b981;">🛡️ Domínio de Anúncio / ParkLogic Bloqueado</h3>
+<p style="color:#9aa1b8;font-size:13px;">Selecione outro servidor ativo na barra superior (Byse ou MixDrop) para assistir normalmente.</p>
+</body></html>
+"@
+                    Send-TextResponse $ctx $parkSafe "text/html; charset=utf-8"
+                    continue
+                }
+
+                # Remove scripts de anúncios conhecidos, trackers e popup handlers
+                $html = [System.Text.RegularExpressions.Regex]::Replace($html, '<script[^>]+src=["''][^"'']*(googlesyndication|doubleclick|popads|popcash|adsterra|monetag|propeller|exoclick|parklogic|sedoparking|histats|amung\.us|taboola|outbrain|soakysecrets|mdstats\.info|xads\.js|adblock\.js|onclick|1xbet|betano|bet365|tigrinho)[^"'']*["''][^>]*>\s*</script>', '', [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
+                $html = [System.Text.RegularExpressions.Regex]::Replace($html, 'target=["'']_blank["'']', 'target="_self"', [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
                 $Script:BlockedCount++
 
                 $uriObj = [System.Uri]$targetUrl
                 $baseTag = "<base href=`"$($uriObj.Scheme)://$($uriObj.Authority)/`">"
-                $shieldScript = "<script>(function(){window.open=function(){return null;};try{Object.defineProperty(window,'onbeforeunload',{set:function(){},get:function(){return null;}});}catch(e){}})();</script>"
+                $shieldScript = "<script>(function(){try{Object.defineProperty(window,'open',{value:function(){return null;},writable:false,configurable:false});}catch(e){window.open=function(){return null;};}try{Object.defineProperty(window,'onbeforeunload',{set:function(){},get:function(){return null;}});}catch(e){}var _origAdd=EventTarget.prototype.addEventListener;EventTarget.prototype.addEventListener=function(t,fn,o){if((this===document||this===window)&&(t==='click'||t==='mousedown'||t==='touchstart')&&fn&&fn.toString().indexOf('open')!==-1){return;}return _origAdd.call(this,t,fn,o);};setInterval(function(){document.querySelectorAll('a[target=""_blank""],iframe[src*=""ads""],div[style*=""z-index: 2147483""],div[style*=""z-index:2147483""]').forEach(function(el){if(el.tagName==='A'){el.removeAttribute('target');}else{el.remove();}});},900);})();</script>"
 
                 if ($html -match "(?i)<head[^>]*>") {
                     $html = [System.Text.RegularExpressions.Regex]::Replace($html, "(?i)(<head[^>]*>)", "`$1$baseTag$shieldScript", 1)
@@ -526,9 +698,9 @@ while ($listener.IsListening) {
                 $safeTarget = [System.Net.WebUtility]::HtmlEncode($targetUrl)
                 $fallback = @"
 <!DOCTYPE html><html><body style="background:#090a0f;color:#f5f7fc;font-family:sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;gap:14px;text-align:center;padding:24px;">
-<h3>Este servidor exige abertura direta sem proxy</h3>
-<p style="color:#9aa1b8;font-size:13px;">Troque para outro servidor na barra superior ou abra o link protegido:</p>
-<a href="$safeTarget" target="_blank" style="background:#e50914;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:700;">Abrir Player Direto</a>
+<h3>Este servidor exige carregamento direto</h3>
+<p style="color:#9aa1b8;font-size:13px;">Troque para outro servidor na barra superior (ex: Byse / MixDrop):</p>
+<a href="$safeTarget" target="_blank" rel="noopener noreferrer" style="background:#e50914;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:700;">Abrir Player</a>
 </body></html>
 "@
                 Send-TextResponse $ctx $fallback "text/html; charset=utf-8"

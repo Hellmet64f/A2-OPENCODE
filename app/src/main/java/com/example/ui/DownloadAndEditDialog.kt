@@ -319,7 +319,7 @@ fun DownloadAndEditDialog(
 
                             2 -> PcCompanionTabContent(
                                 onCopyPcUrl = {
-                                    clipboardManager.setText(AnnotatedString("https://www.pobreflixtv.delivery/"))
+                                    clipboardManager.setText(AnnotatedString("https://www.pobreflixtv.codes/"))
                                     Toast.makeText(context, "Link do catálogo copiado!", Toast.LENGTH_SHORT).show()
                                 }
                             )

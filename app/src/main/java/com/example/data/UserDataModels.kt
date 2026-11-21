@@ -18,7 +18,7 @@ data class WatchHistoryDoc(
     val coverUrl: String? = null,
     val itemUrl: String = "",
     val currentUrl: String = "",
-    val mediaType: String = "movie", // "movie" | "series"
+    val mediaType: String = "movie", // "movie" | "series" | "anime"
     val season: Int = 1,
     val episodeNumber: Int = 1,
     val episodeTitle: String? = null,
@@ -34,7 +34,7 @@ data class WatchHistoryDoc(
         title = title.ifBlank { "Sem Título" },
         coverUrl = coverUrl.orEmpty(),
         currentUrl = currentUrl.ifBlank { itemUrl },
-        isSeries = mediaType == "series",
+        isSeries = mediaType == "series" || mediaType == "anime",
         season = season.coerceIn(1, 200),
         episodeNumber = episodeNumber.coerceIn(1, 5000),
         episodeTitle = episodeTitle.orEmpty(),
@@ -42,7 +42,8 @@ data class WatchHistoryDoc(
         favorite = favorite,
         completed = completed,
         progressSeconds = progressSeconds.coerceIn(0L, 86400L),
-        timestamp = (updatedAt ?: createdAt)?.toDate()?.time ?: System.currentTimeMillis()
+        timestamp = (updatedAt ?: createdAt)?.toDate()?.time ?: System.currentTimeMillis(),
+        isAnime = mediaType == "anime"
     )
 }
 
@@ -92,7 +93,7 @@ object FirestoreCodec {
 
     private fun toHistoryCommonMap(userId: String, item: WatchHistoryItem): Map<String, Any> {
         val cleanTitle = item.title.trim().take(200).ifBlank { "Sem Título" }
-        val cleanItemUrl = item.id.trim().take(1000).ifBlank { "https://www.pobreflixtv.delivery/" }
+        val cleanItemUrl = item.id.trim().take(1000).ifBlank { "https://www.pobreflixtv.codes/" }
         val cleanCurrentUrl = item.currentUrl.trim().take(1000).ifBlank { cleanItemUrl }
         val cleanCover = item.coverUrl.trim().take(1000).takeIf { it.isNotEmpty() }
         val cleanEpTitle = item.episodeTitle.trim().take(200).takeIf { it.isNotEmpty() }
@@ -102,13 +103,19 @@ object FirestoreCodec {
             .distinct()
             .take(300)
 
+        val resolvedMediaType = when {
+            item.isAnime || cleanItemUrl.contains("anichan.to") -> "anime"
+            item.isSeries -> "series"
+            else -> "movie"
+        }
+
         val map = mutableMapOf<String, Any?>(
             "userId" to userId,
             "title" to cleanTitle,
             "coverUrl" to cleanCover,
             "itemUrl" to cleanItemUrl,
             "currentUrl" to cleanCurrentUrl,
-            "mediaType" to if (item.isSeries) "series" else "movie",
+            "mediaType" to resolvedMediaType,
             "season" to item.season.coerceIn(1, 200),
             "episodeNumber" to item.episodeNumber.coerceIn(1, 5000),
             "episodeTitle" to cleanEpTitle,

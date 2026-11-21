@@ -1,6 +1,7 @@
 package com.example.network
 
 import android.content.Context
+import android.net.Uri
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -12,8 +13,8 @@ import java.io.File
 import java.util.concurrent.TimeUnit
 
 /**
- * Motor AdBlock 60+ com atualização automática remota e cache local.
- * Protege o player contra popups, redirecionamentos, rastreadores e anúncios de apostas.
+ * Motor AdBlock 100+ com atualização automática remota, bloqueio heurístico e escudo anti-redirecionamento.
+ * Protege o player contra popups, popunders, overlays invisíveis, rastreadores e anúncios de apostas.
  */
 object AdBlockManager {
     private const val PREFS_NAME = "a2_miguel_adblock_prefs"
@@ -22,7 +23,7 @@ object AdBlockManager {
     private const val CACHE_FILE_NAME = "adblock_dynamic_rules.txt"
     private const val UPDATE_INTERVAL_MS = 12L * 60L * 60L * 1000L // 12 horas
 
-    // 72 regras nativas sempre ativas (Popups, Vídeo Ads, Apostas, Trackers, Redirects)
+    // 100+ regras nativas sempre ativas (Popups, Vídeo Ads, Apostas, Trackers, Redirects, Parked Domains)
     val BASELINE_RULES: List<String> = listOf(
         "googlesyndication.com",
         "doubleclick.net",
@@ -36,6 +37,7 @@ object AdBlockManager {
         "propellerads.com",
         "propellerclick.com",
         "onclickads.net",
+        "onclickalgo.com",
         "exoclick.com",
         "exosrv.com",
         "realsrv.com",
@@ -47,6 +49,7 @@ object AdBlockManager {
         "al5sm.com",
         "trafficjunky.net",
         "trafficfactory.biz",
+        "trafficstars.com",
         "adcash.com",
         "acscdn.com",
         "yllix.com",
@@ -59,6 +62,8 @@ object AdBlockManager {
         "hilltopads.net",
         "richads.com",
         "clickadu.com",
+        "clickaine.com",
+        "clksite.com",
         "admaven.com",
         "bidvertiser.com",
         "infolinks.com",
@@ -72,6 +77,13 @@ object AdBlockManager {
         "smartadserver.com",
         "mediavine.com",
         "adthrive.com",
+        "tsyndicate.com",
+        "bnmla.com",
+        "rtmark.net",
+        "soakysecrets.com",
+        "mdstats.info",
+        "adtelligent.com",
+        "ero-advertising.com",
         "1xbet",
         "bet365",
         "betano",
@@ -79,6 +91,16 @@ object AdBlockManager {
         "sportingbet",
         "pixbet",
         "estrelabet",
+        "bet7k",
+        "superbet",
+        "kto.com",
+        "novibet",
+        "rivalo",
+        "parimatch",
+        "bodog",
+        "1win",
+        "pin-up",
+        "brazino",
         "cassino",
         "casino",
         "aposta",
@@ -86,6 +108,9 @@ object AdBlockManager {
         "fortune-tiger",
         "oldnessdernly.qpon",
         "parklogic.com",
+        "sedoparking.com",
+        "parkingcrew.net",
+        "bodis.com",
         "pushwoosh.com",
         "onesignal.com",
         "hotjar.com",
@@ -95,7 +120,42 @@ object AdBlockManager {
         "adf.ly",
         "ouo.io",
         "shorte.st",
-        "linkvertise.com"
+        "linkvertise.com",
+        "chaturbate.com",
+        "stripchat.com",
+        "livejasmin.com",
+        "xads.js",
+        "popunder"
+    )
+
+    private val HEURISTIC_AD_PATHS = listOf(
+        "/xads.js",
+        "/adblock.js",
+        "popunder",
+        "onclick.js",
+        "/vast.",
+        "/vpaid.",
+        "adserver",
+        "clicktrack",
+        "zoneid=",
+        "parklogic",
+        "sedoparking"
+    )
+
+    private val ALLOWED_PLAYER_HOST_TOKENS = listOf(
+        "pobreflixtv",
+        "anichan.to",
+        "byse",
+        "mxdrop",
+        "mixdrop",
+        "streamtape",
+        "playmogo",
+        "dood",
+        "filemoon",
+        "vidhide",
+        "streamwish",
+        "earnvids",
+        "voe.sx"
     )
 
     private val REMOTE_FILTER_SOURCES = listOf(
@@ -181,7 +241,7 @@ object AdBlockManager {
                     val req = Request.Builder()
                         .url(sourceUrl)
                         .get()
-                        .addHeader("User-Agent", "A2Miguel-AdBlock/2.0")
+                        .addHeader("User-Agent", "A2Miguel-AdBlock/2.1")
                         .build()
                     httpClient.newCall(req).execute().use { resp ->
                         if (resp.isSuccessful) {
@@ -235,14 +295,32 @@ object AdBlockManager {
         return candidate
     }
 
-    private fun isWhitelistedDomain(domain: String): Boolean {
-        return domain.contains("pobreflixtv") ||
-            domain.contains("tmdb.org") ||
-            domain.contains("byse") ||
-            domain.contains("mixdrop") ||
-            domain.contains("streamtape") ||
-            domain.contains("googleapis.com") ||
-            domain.contains("gstatic.com")
+    private fun extractHost(url: String): String {
+        return try {
+            Uri.parse(url).host?.lowercase().orEmpty()
+        } catch (_: Exception) {
+            url.substringAfter("://").substringBefore("/").substringBefore(":").lowercase()
+        }
+    }
+
+    private fun isWhitelistedDomain(domainOrUrl: String): Boolean {
+        val host = if (domainOrUrl.contains("://")) extractHost(domainOrUrl) else domainOrUrl.lowercase()
+        return host.contains("pobreflixtv") ||
+            host.contains("anichan.to") ||
+            host.contains("anilist.co") ||
+            host.contains("tmdb.org") ||
+            host.contains("byse") ||
+            host.contains("mxdrop") ||
+            host.contains("mixdrop") ||
+            host.contains("streamtape") ||
+            host.contains("playmogo") ||
+            host.contains("filemoon") ||
+            host.contains("vidhide") ||
+            host.contains("streamwish") ||
+            host.contains("googleapis.com") ||
+            host.contains("gstatic.com") ||
+            host.contains("cdnjs.cloudflare.com") ||
+            host.contains("code.jquery.com")
     }
 
     fun isBlockedUrl(url: String): Boolean {
@@ -251,10 +329,41 @@ object AdBlockManager {
         if (lower.startsWith("data:") || lower.startsWith("blob:") || lower.startsWith("about:")) {
             return false
         }
+
+        // Mesmo em domínios de vídeo confiáveis, bloqueia scripts específicos de anúncio embutidos (ex: /xads.js)
+        if (HEURISTIC_AD_PATHS.any { lower.contains(it) }) {
+            return true
+        }
+
         if (isWhitelistedDomain(lower)) return false
 
         val rules = activeRulesSet
         return rules.any { rule -> lower.contains(rule) }
+    }
+
+    /**
+     * Escudo de navegação principal no Player: impede que cliques em overlays invisíveis
+     * redirecionem o WebView para sites de anúncios, apostas ou domínios estacionados.
+     */
+    fun isAllowedTopFrameNavigation(currentPageUrl: String, targetUrl: String): Boolean {
+        if (targetUrl.isBlank()) return false
+        val lower = targetUrl.lowercase()
+        if (!lower.startsWith("http://") && !lower.startsWith("https://")) return false
+        if (isBlockedUrl(lower)) return false
+
+        val targetHost = extractHost(lower)
+        if (targetHost.isBlank()) return false
+
+        val currentHost = extractHost(currentPageUrl)
+        if (currentHost.isNotBlank()) {
+            val targetBase = targetHost.removePrefix("www.")
+            val currentBase = currentHost.removePrefix("www.")
+            if (targetBase == currentBase || targetBase.endsWith(".$currentBase") || currentBase.endsWith(".$targetBase")) {
+                return true
+            }
+        }
+
+        return ALLOWED_PLAYER_HOST_TOKENS.any { token -> targetHost.contains(token) }
     }
 
     fun recordBlocked() {

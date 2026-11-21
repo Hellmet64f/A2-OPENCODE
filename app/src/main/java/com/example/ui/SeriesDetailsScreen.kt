@@ -137,12 +137,12 @@ fun SeriesDetailsScreen(
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         Surface(
-                            color = CrimsonPrimary,
+                            color = if (state.series.isAnime) AmberGold else CrimsonPrimary,
                             shape = RoundedCornerShape(6.dp)
                         ) {
                             Text(
-                                text = "SÉRIE COMPLETA",
-                                color = Color.White,
+                                text = if (state.series.isAnime) "ANIME COMPLETO" else "SÉRIE COMPLETA",
+                                color = if (state.series.isAnime) Color.Black else Color.White,
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Black,
                                 modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)

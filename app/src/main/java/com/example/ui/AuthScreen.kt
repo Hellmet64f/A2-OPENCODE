@@ -13,6 +13,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CloudDone
+import androidx.compose.material.icons.filled.PersonOutline
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material3.*
@@ -161,9 +162,41 @@ fun signOutUser(
     }
 }
 
+object GuestModePrefs {
+    private const val PREFS_NAME = "a2_miguel_auth_prefs"
+    private const val KEY_GUEST_MODE = "guest_mode_enabled"
+    private const val KEY_PENDING_GUEST_SYNC = "pending_guest_sync"
+
+    fun isGuestMode(context: Context): Boolean =
+        context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getBoolean(KEY_GUEST_MODE, false)
+
+    fun setGuestMode(context: Context, enabled: Boolean) {
+        context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean(KEY_GUEST_MODE, enabled)
+            .apply {
+                if (enabled) putBoolean(KEY_PENDING_GUEST_SYNC, true)
+            }
+            .apply()
+    }
+
+    fun hasPendingGuestSync(context: Context): Boolean =
+        context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getBoolean(KEY_PENDING_GUEST_SYNC, false)
+
+    fun clearPendingGuestSync(context: Context) {
+        context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean(KEY_PENDING_GUEST_SYNC, false)
+            .apply()
+    }
+}
+
 @Composable
 fun AuthScreen(
-    onAuthSuccess: () -> Unit
+    onAuthSuccess: () -> Unit,
+    onContinueAsGuest: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -255,7 +288,7 @@ fun AuthScreen(
                     )
 
                     Text(
-                        text = "Filmes e Séries no Celular, PC e TV",
+                        text = "Filmes, Séries e Animes no Celular, PC e TV",
                         style = MaterialTheme.typography.titleLarge,
                         color = TextPrimary,
                         textAlign = TextAlign.Center
@@ -282,7 +315,7 @@ fun AuthScreen(
                         AuthFeatureRow(
                             icon = Icons.Default.Shield,
                             tint = EmeraldAdBlock,
-                            title = "70+ Regras AdBlock Auto-Atualizáveis",
+                            title = "100+ Regras AdBlock Auto-Atualizáveis",
                             subtitle = "Bloqueia popups e anúncios automaticamente"
                         )
                         AuthFeatureRow(
@@ -375,6 +408,44 @@ fun AuthScreen(
                             )
                         }
                     }
+
+                    OutlinedButton(
+                        onClick = {
+                            GuestModePrefs.setGuestMode(context, true)
+                            onContinueAsGuest()
+                        },
+                        enabled = !isSigningIn,
+                        shape = RoundedCornerShape(14.dp),
+                        border = BorderStroke(1.dp, ObsidianStroke),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            containerColor = ObsidianBg.copy(alpha = 0.5f),
+                            contentColor = TextPrimary
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 52.dp)
+                            .testTag("guest_sign_in_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.PersonOutline,
+                            contentDescription = null,
+                            tint = AmberGold,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Entrar como Convidado (Sem Login)",
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 14.sp
+                        )
+                    }
+
+                    Text(
+                        text = "No modo convidado, histórico e favoritos ficam salvos localmente e podem ser exportados em JSON ou sincronizados ao conectar o Google depois.",
+                        color = TextSecondary.copy(alpha = 0.8f),
+                        fontSize = 11.sp,
+                        textAlign = TextAlign.Center
+                    )
 
                     Text(
                         text = "Criado por Miguel Rafael Montana • Sem custos ou assinaturas",

@@ -48,12 +48,12 @@ import kotlinx.coroutines.delay
 fun SearchScreen(
     state: AppState.HomeLoaded,
     onMovieClick: (Movie) -> Unit,
-    onSearch: (String) -> Unit,
+    onSearch: (query: String, saveRecent: Boolean) -> Unit,
     onRemoveRecentSearch: (String) -> Unit = {},
     onClose: () -> Unit
 ) {
     var query by remember { mutableStateOf(state.searchQuery) }
-    var filterType by remember { mutableStateOf("Todos") } // "Todos", "Filmes", "Séries"
+    var filterType by remember { mutableStateOf("Todos") } // "Todos", "Filmes", "Séries", "Animes"
     val keyboardController = LocalSoftwareKeyboardController.current
     val focusRequester = remember { FocusRequester() }
 
@@ -63,9 +63,13 @@ fun SearchScreen(
 
     LaunchedEffect(query) {
         val trimmed = query.trim()
-        if (trimmed.length >= 2 && trimmed != state.searchQuery) {
-            delay(450)
-            onSearch(trimmed)
+        if (trimmed.isEmpty()) {
+            if (state.searchQuery.isNotEmpty() || state.searchResults.isNotEmpty()) {
+                onSearch("", false)
+            }
+        } else if (trimmed.length >= 2 && trimmed != state.searchQuery) {
+            delay(400)
+            onSearch(trimmed, false)
         }
     }
 
@@ -79,8 +83,9 @@ fun SearchScreen(
     val results = state.searchResults
     val filteredResults = remember(results, filterType) {
         when (filterType) {
-            "Filmes" -> results.filter { !it.isSeries }
-            "Séries" -> results.filter { it.isSeries }
+            "Filmes" -> results.filter { !it.isSeries && !it.isAnime }
+            "Séries" -> results.filter { it.isSeries && !it.isAnime }
+            "Animes" -> results.filter { it.isAnime || it.title.contains("dragon ball", ignoreCase = true) }
             else -> results
         }
     }
@@ -92,11 +97,11 @@ fun SearchScreen(
             .statusBarsPadding()
             .navigationBarsPadding()
     ) {
-        // Header Search Bar
+        // Header Search Bar (limpo, com foco em celular)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+                .padding(horizontal = 14.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(
@@ -113,16 +118,17 @@ fun SearchScreen(
                 )
             }
 
-            Spacer(modifier = Modifier.width(10.dp))
+            Spacer(modifier = Modifier.width(8.dp))
 
             OutlinedTextField(
                 value = query,
                 onValueChange = { query = it },
                 placeholder = {
                     Text(
-                        "Buscar filmes ou séries...",
+                        "Buscar filme, série ou anime...",
                         color = TextSecondary,
-                        fontSize = 13.sp
+                        fontSize = 13.sp,
+                        maxLines = 1
                     )
                 },
                 singleLine = true,
@@ -130,7 +136,7 @@ fun SearchScreen(
                 keyboardActions = KeyboardActions(
                     onSearch = {
                         keyboardController?.hide()
-                        if (query.isNotBlank()) onSearch(query.trim())
+                        if (query.isNotBlank()) onSearch(query.trim(), true)
                     }
                 ),
                 leadingIcon = {
@@ -145,7 +151,7 @@ fun SearchScreen(
                         IconButton(
                             onClick = {
                                 query = ""
-                                onSearch("")
+                                onSearch("", false)
                             },
                             modifier = Modifier.size(48.dp)
                         ) {
@@ -174,7 +180,7 @@ fun SearchScreen(
                     .onKeyEvent { event ->
                         if (event.type == KeyEventType.KeyUp && (event.key == Key.Enter || event.key == Key.NumPadEnter)) {
                             keyboardController?.hide()
-                            if (query.isNotBlank()) onSearch(query.trim())
+                            if (query.isNotBlank()) onSearch(query.trim(), true)
                             true
                         } else false
                     }
@@ -185,11 +191,11 @@ fun SearchScreen(
             Button(
                 onClick = {
                     keyboardController?.hide()
-                    if (query.isNotBlank()) onSearch(query.trim())
+                    if (query.isNotBlank()) onSearch(query.trim(), true)
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = CrimsonPrimary),
                 shape = RoundedCornerShape(20.dp),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 12.dp),
                 modifier = Modifier
                     .heightIn(min = 48.dp)
                     .testTag("search_submit_button")
@@ -198,15 +204,16 @@ fun SearchScreen(
             }
         }
 
-        // Type Filter Chips
+        // Type Filter Chips (Todos | Filmes | Séries | Animes)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp, vertical = 4.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            listOf("Todos", "Filmes", "Séries").forEach { type ->
+            listOf("Todos", "Filmes", "Séries", "Animes").forEach { type ->
                 val isSelected = filterType == type
                 FilterChip(
                     selected = isSelected,
@@ -219,8 +226,8 @@ fun SearchScreen(
                         )
                     },
                     colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = CrimsonPrimary,
-                        selectedLabelColor = Color.White,
+                        selectedContainerColor = if (type == "Animes") AmberGold else CrimsonPrimary,
+                        selectedLabelColor = if (type == "Animes") Color.Black else Color.White,
                         containerColor = ObsidianCard,
                         labelColor = TextSecondary
                     ),
@@ -229,7 +236,9 @@ fun SearchScreen(
                         selected = isSelected,
                         borderColor = ObsidianStroke
                     ),
-                    modifier = Modifier.heightIn(min = 48.dp)
+                    modifier = Modifier
+                        .heightIn(min = 48.dp)
+                        .testTag("search_filter_${type.lowercase()}")
                 )
             }
         }
@@ -262,7 +271,7 @@ fun SearchScreen(
                                 modifier = Modifier
                                     .clickable {
                                         query = recent
-                                        onSearch(recent)
+                                        onSearch(recent, true)
                                     }
                                     .padding(start = 12.dp, end = 6.dp, top = 6.dp, bottom = 6.dp)
                             ) {
@@ -271,7 +280,7 @@ fun SearchScreen(
                                 Text(recent, color = TextPrimary, fontSize = 12.sp)
                                 IconButton(
                                     onClick = { onRemoveRecentSearch(recent) },
-                                    modifier = Modifier.size(32.dp)
+                                    modifier = Modifier.size(36.dp)
                                 ) {
                                     Icon(Icons.Default.Close, contentDescription = "Remover busca", tint = TextSecondary, modifier = Modifier.size(14.dp))
                                 }
@@ -294,7 +303,7 @@ fun SearchScreen(
                     ) {
                         CircularProgressIndicator(color = CrimsonPrimary)
                         Spacer(modifier = Modifier.height(14.dp))
-                        Text("Pesquisando filmes e séries...", color = TextSecondary, fontSize = 14.sp)
+                        Text("Buscando em Filmes, Séries e Animes...", color = TextSecondary, fontSize = 14.sp)
                     }
                 }
 
@@ -321,14 +330,17 @@ fun SearchScreen(
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = "Dica: tente uma palavra simples, sem acentos ou só o nome principal.",
+                            text = "Dica: tente uma palavra simples, sem acentos ou alterne para o filtro 'Todos'.",
                             color = TextSecondary,
                             fontSize = 13.sp,
                             textAlign = TextAlign.Center
                         )
                         Spacer(modifier = Modifier.height(16.dp))
                         Button(
-                            onClick = { onSearch(state.searchQuery) },
+                            onClick = {
+                                filterType = "Todos"
+                                onSearch(state.searchQuery, true)
+                            },
                             colors = ButtonDefaults.buttonColors(containerColor = CrimsonPrimary),
                             shape = RoundedCornerShape(14.dp),
                             modifier = Modifier.heightIn(min = 48.dp)
@@ -381,7 +393,7 @@ fun SearchScreen(
                         )
                         Spacer(modifier = Modifier.height(14.dp))
                         Text(
-                            text = "Pesquise filmes e séries completos",
+                            text = "Pesquise filmes, séries e animes",
                             color = TextPrimary,
                             style = MaterialTheme.typography.titleLarge,
                             textAlign = TextAlign.Center
@@ -397,11 +409,11 @@ fun SearchScreen(
                             modifier = Modifier.horizontalScroll(rememberScrollState()),
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            listOf("Batman", "Vingadores", "Breaking Bad", "Stranger Things", "Homem-Aranha").forEach { suggestion ->
+                            listOf("Dragon Ball", "One Piece", "Batman", "Vingadores", "Breaking Bad", "Solo Leveling").forEach { suggestion ->
                                 AssistChip(
                                     onClick = {
                                         query = suggestion
-                                        onSearch(suggestion)
+                                        onSearch(suggestion, true)
                                     },
                                     label = { Text(suggestion, color = TextPrimary, fontSize = 12.sp) },
                                     colors = AssistChipDefaults.assistChipColors(containerColor = ObsidianCard),

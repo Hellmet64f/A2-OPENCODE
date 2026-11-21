@@ -124,6 +124,32 @@ test("Authenticated owner can create, update, list, and delete watch_history", a
     aliceDb.collection("users").doc(ALICE_UID).collection("watch_history").get()
   );
 
+  // Verify anime mediaType is allowed for owner
+  const animeRef = aliceDb
+    .collection("users")
+    .doc(ALICE_UID)
+    .collection("watch_history")
+    .doc("anime_hash_1");
+  await assertSucceeds(
+    animeRef.set({
+      userId: ALICE_UID,
+      title: "Dragon Ball DAIMA",
+      coverUrl: "https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx170083.png",
+      itemUrl: "https://anichan.to/anime/170083/dragon-ball-daima",
+      currentUrl: "https://anichan.to/anime/170083/dragon-ball-daima/1",
+      mediaType: "anime",
+      season: 1,
+      episodeNumber: 1,
+      episodeTitle: "Episódio 1",
+      watchedEpisodes: ["1x1"],
+      favorite: true,
+      completed: false,
+      progressSeconds: 0,
+      createdAt: created,
+      updatedAt: created,
+    })
+  );
+
   // Reject modifying immutable createdAt
   await assertFails(
     docRef.update({

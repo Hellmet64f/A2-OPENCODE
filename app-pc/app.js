@@ -1,10 +1,10 @@
-// A2 Miguel PC - Motor Ao Vivo de Filmes e Séries (Igual ao Celular, sem Anúncios e sem AniChan)
+// A2 Miguel PC - Motor Ao Vivo de Filmes, Séries e Animes (Igual ao Celular, sem Anúncios)
 
 const STORAGE_KEY_FALLBACK = 'a2_miguel_pc_data_v2';
 
 const state = {
-    view: 'home', // home | movies | series | history | favorites
-    typeFilter: 'all', // all | movie | series
+    view: 'home', // home | movies | series | animes | history | favorites
+    typeFilter: 'all', // all | movie | series | anime
     searchQuery: '',
     catalogPage: 1,
     catalogItems: [],
@@ -25,8 +25,8 @@ const state = {
         }
     },
     adblock: {
-        count: 72,
-        baselineCount: 72,
+        count: 101,
+        baselineCount: 101,
         blockedCount: 0,
         lastUpdate: 0,
         autoUpdate: true
@@ -326,14 +326,17 @@ function mergeUserData(base, incoming) {
 
 function normalizeHistoryEntry(raw) {
     const id = raw.id || raw.itemUrl || raw.currentUrl || '';
+    const isAnime = Boolean(raw.isAnime || raw.mediaType === 'anime' || id.includes('anichan.to') || id.includes('/animes/'));
+    const isSeries = Boolean(isAnime || raw.isSeries || raw.mediaType === 'series');
     return {
         id,
         itemUrl: id,
         title: raw.title || 'Sem Título',
         coverUrl: raw.coverUrl || raw.cover || '',
         currentUrl: raw.currentUrl || id,
-        isSeries: Boolean(raw.isSeries || raw.mediaType === 'series'),
-        mediaType: (raw.isSeries || raw.mediaType === 'series') ? 'series' : 'movie',
+        isSeries,
+        isAnime,
+        mediaType: isAnime ? 'anime' : (isSeries ? 'series' : 'movie'),
         season: Number(raw.season || 1),
         episodeNumber: Number(raw.episodeNumber || 1),
         episodeTitle: raw.episodeTitle || '',
@@ -373,12 +376,14 @@ function toggleFavoriteItem(item) {
     const id = item.url || item.id;
     const existing = findHistoryEntry(id);
     const nextFav = !(existing?.favorite);
+    const isAnime = Boolean(item.isAnime || id.includes('anichan.to') || id.includes('/animes/'));
     saveHistoryProgress({
         id,
         title: item.title,
         coverUrl: item.coverUrl || item.cover || '',
         currentUrl: existing?.currentUrl || id,
-        isSeries: Boolean(item.isSeries),
+        isSeries: Boolean(item.isSeries || isAnime),
+        isAnime,
         season: existing?.season || 1,
         episodeNumber: existing?.episodeNumber || 1,
         episodeTitle: existing?.episodeTitle || '',
@@ -394,12 +399,14 @@ function toggleCompletedItem(item) {
     const id = item.url || item.id;
     const existing = findHistoryEntry(id);
     const nextCompleted = !(existing?.completed);
+    const isAnime = Boolean(item.isAnime || id.includes('anichan.to') || id.includes('/animes/'));
     saveHistoryProgress({
         id,
         title: item.title,
         coverUrl: item.coverUrl || item.cover || '',
         currentUrl: existing?.currentUrl || id,
-        isSeries: Boolean(item.isSeries),
+        isSeries: Boolean(item.isSeries || isAnime),
+        isAnime,
         season: existing?.season || 1,
         episodeNumber: existing?.episodeNumber || 1,
         episodeTitle: existing?.episodeTitle || '',
@@ -498,6 +505,7 @@ async function loadLiveCatalog(page = 1, append = false) {
     let category = 'home';
     if (state.view === 'movies') category = 'filmes';
     else if (state.view === 'series') category = 'series';
+    else if (state.view === 'animes') category = 'animes';
 
     try {
         const res = await fetch(`/api/catalog?category=${encodeURIComponent(category)}&page=${page}`);
@@ -516,7 +524,7 @@ async function loadLiveCatalog(page = 1, append = false) {
             banner.style.display = 'block';
             banner.innerHTML = '⚠️ Não foi possível carregar o catálogo ao vivo neste momento. Verifique sua internet e clique em <strong>🔄 Atualizar</strong>.';
         }
-        document.getElementById('paginationBar').style.display = items.length >= 12 ? 'flex' : 'none';
+        document.getElementById('paginationBar').style.display = (category !== 'animes' && items.length >= 12) ? 'flex' : 'none';
     } catch (_) {
         banner.style.display = 'block';
         banner.innerHTML = '⚠️ Servidor local desconectado ou sem internet. Clique em <strong>🔄 Atualizar</strong>.';
@@ -553,7 +561,7 @@ async function performLiveSearch(query, saveRecent = true) {
 function switchView(viewName) {
     state.view = viewName;
     document.querySelectorAll('.nav-item').forEach(b => b.classList.toggle('active', b.dataset.view === viewName));
-    if (viewName === 'movies' || viewName === 'series' || viewName === 'home') {
+    if (viewName === 'movies' || viewName === 'series' || viewName === 'animes' || viewName === 'home') {
         state.searchQuery = '';
         state.searchResults = [];
         document.getElementById('searchInput').value = '';
@@ -568,7 +576,7 @@ function renderRecentSearches() {
     const row = document.getElementById('recentSearchesRow');
     row.innerHTML = '';
     const list = state.userData.recentSearches || [];
-    const fallbackSuggestions = ['Vingadores', 'Deadpool', 'Breaking Bad', 'Stranger Things', 'Batman'];
+    const fallbackSuggestions = ['Dragon Ball', 'Deadpool', 'One Piece', 'Breaking Bad', 'Batman'];
     const chips = list.length ? list : fallbackSuggestions;
     chips.slice(0, 8).forEach(term => {
         const btn = document.createElement('button');
@@ -609,19 +617,21 @@ function renderContinueRow() {
             </div>
         `;
         card.addEventListener('click', () => {
-            if (entry.isSeries) {
+            if (entry.isSeries || entry.isAnime) {
                 openPlayerDirect({
                     title: entry.title,
                     url: entry.id,
                     coverUrl: entry.coverUrl,
-                    isSeries: true
+                    isSeries: true,
+                    isAnime: Boolean(entry.isAnime)
                 }, entry.currentUrl, entry.season, entry.episodeNumber, entry.episodeTitle);
             } else {
                 openPlayerDirect({
                     title: entry.title,
                     url: entry.id,
                     coverUrl: entry.coverUrl,
-                    isSeries: false
+                    isSeries: false,
+                    isAnime: false
                 }, entry.currentUrl, 1, 1, entry.title);
             }
         });
@@ -650,7 +660,8 @@ function renderCurrentView() {
             cover: h.coverUrl,
             url: h.id,
             isSeries: h.isSeries,
-            year: h.isSeries ? `T${h.season} E${h.episodeNumber}` : 'Filme',
+            isAnime: Boolean(h.isAnime),
+            year: (h.isSeries || h.isAnime) ? `T${h.season} E${h.episodeNumber}` : 'Filme',
             historyEntry: h
         }));
         heroEl.style.display = 'none';
@@ -662,21 +673,26 @@ function renderCurrentView() {
             cover: h.coverUrl,
             url: h.id,
             isSeries: h.isSeries,
-            year: h.isSeries ? `T${h.season} E${h.episodeNumber}` : 'Filme',
+            isAnime: Boolean(h.isAnime),
+            year: (h.isSeries || h.isAnime) ? `T${h.season} E${h.episodeNumber}` : 'Filme',
             historyEntry: h
         }));
         heroEl.style.display = 'none';
     } else {
         titleEl.textContent = state.view === 'movies'
             ? '🎬 Todos os Filmes'
-            : (state.view === 'series' ? '📺 Todas as Séries' : '🔥 Catálogo Completo ao Vivo');
+            : (state.view === 'series'
+                ? '📺 Todas as Séries'
+                : (state.view === 'animes' ? '⛩️ Todos os Animes (AniChan)' : '🔥 Catálogo Completo ao Vivo'));
         sourceItems = state.catalogItems;
         renderHeroBanner(sourceItems[0]);
     }
 
     const filtered = sourceItems.filter(item => {
-        if (state.typeFilter === 'movie') return !item.isSeries;
-        if (state.typeFilter === 'series') return Boolean(item.isSeries);
+        const isAnime = Boolean(item.isAnime || (item.url && (item.url.includes('anichan.to') || item.url.includes('/animes/'))));
+        if (state.typeFilter === 'movie') return !item.isSeries && !isAnime;
+        if (state.typeFilter === 'series') return Boolean(item.isSeries) && !isAnime;
+        if (state.typeFilter === 'anime') return isAnime;
         return true;
     });
 
@@ -687,25 +703,29 @@ function renderCurrentView() {
         grid.innerHTML = `
             <div style="grid-column: 1/-1; text-align:center; padding: 60px 20px; color: var(--text-muted);">
                 <p style="font-size: 16px; font-weight: 700;">Nenhum título encontrado nesta aba</p>
-                <p style="font-size: 13px; margin-top: 6px;">Use a barra de busca acima ou alterne o filtro Todos / Filmes / Séries.</p>
+                <p style="font-size: 13px; margin-top: 6px;">Use a barra de busca acima ou alterne o filtro Todos / Filmes / Séries / Animes.</p>
             </div>
         `;
         return;
     }
 
     filtered.forEach(item => {
+        const isAnime = Boolean(item.isAnime || (item.url && (item.url.includes('anichan.to') || item.url.includes('/animes/'))));
         const hist = item.historyEntry || findHistoryEntry(item.url);
         const card = document.createElement('div');
         card.className = 'media-card';
         const watchedTag = hist && (hist.completed || (hist.watchedEpisodes && hist.watchedEpisodes.length > 0))
             ? `<span class="card-pill-watched">${hist.completed ? '✓ JÁ VISTO' : `${hist.watchedEpisodes.length} EP`}</span>`
             : '';
+        const typeBadgeHtml = isAnime
+            ? '<span class="card-pill-type card-pill-anime">⛩️ ANIME</span>'
+            : `<span class="card-pill-type">${item.isSeries ? '📺 SÉRIE' : '🎬 FILME'}</span>`;
 
         card.innerHTML = `
             <div class="poster-wrapper">
                 <img src="${escapeAttr(item.cover)}" alt="${escapeAttr(item.title)}" class="poster-img" loading="lazy">
                 <div class="card-badges-top">
-                    <span class="card-pill-type">${item.isSeries ? '📺 SÉRIE' : '🎬 FILME'}</span>
+                    ${typeBadgeHtml}
                     ${watchedTag}
                 </div>
                 <button class="card-fav-btn ${hist?.favorite ? 'active' : ''}" title="Favoritar">${hist?.favorite ? '♥' : '♡'}</button>
@@ -714,7 +734,7 @@ function renderCurrentView() {
                 <div class="media-title">${escapeHtml(item.title)}</div>
                 <div class="media-meta">
                     <span>${escapeHtml(item.year || 'HD')}</span>
-                    <span style="color: #34d399; font-weight: 700;">Dublado</span>
+                    <span style="color: #34d399; font-weight: 700;">${isAnime ? 'AniChan' : 'Dublado'}</span>
                 </div>
             </div>
         `;
@@ -734,18 +754,20 @@ function renderHeroBanner(heroItem) {
         hero.style.display = 'none';
         return;
     }
+    const isAnime = Boolean(heroItem.isAnime || (heroItem.url && heroItem.url.includes('anichan.to')));
     hero.style.display = 'flex';
     document.getElementById('heroBackdrop').style.backgroundImage = `url('${heroItem.cover}')`;
     document.getElementById('heroTitle').textContent = heroItem.title;
-    document.getElementById('heroTypeBadge').textContent = heroItem.isSeries ? '📺 SÉRIE' : '🎬 FILME';
+    document.getElementById('heroTypeBadge').textContent = isAnime ? '⛩️ ANIME' : (heroItem.isSeries ? '📺 SÉRIE' : '🎬 FILME');
     document.getElementById('btnHeroPlay').onclick = () => openItem(heroItem);
     document.getElementById('btnHeroFavorite').onclick = () => toggleFavoriteItem(heroItem);
 }
 
-// --- Detalhes da Série & Temporadas ---
+// --- Detalhes da Série / Anime & Temporadas ---
 
 async function openItem(item) {
-    if (!item.isSeries) {
+    const isAnime = Boolean(item.isAnime || (item.url && (item.url.includes('anichan.to') || item.url.includes('/animes/'))));
+    if (!item.isSeries && !isAnime) {
         openPlayerDirect(item, item.url, 1, 1, item.title);
         return;
     }
@@ -753,7 +775,7 @@ async function openItem(item) {
     const modal = document.getElementById('detailsModal');
     const hist = findHistoryEntry(item.url);
     state.details = {
-        item,
+        item: { ...item, isAnime, isSeries: true },
         videoId: '',
         seasons: [1],
         currentSeason: hist?.season || 1,
@@ -763,7 +785,7 @@ async function openItem(item) {
 
     document.getElementById('detailsPoster').src = item.cover || '';
     document.getElementById('detailsTitle').textContent = item.title;
-    document.getElementById('detailsTypeBadge').textContent = '📺 SÉRIE';
+    document.getElementById('detailsTypeBadge').textContent = isAnime ? '⛩️ ANIME' : '📺 SÉRIE';
     document.getElementById('detailsYearBadge').textContent = item.year || 'HD';
     document.getElementById('detailsDesc').textContent = 'Carregando temporadas e lista completa de episódios...';
     document.getElementById('detailsSeriesControls').style.display = 'flex';
@@ -771,7 +793,7 @@ async function openItem(item) {
     document.getElementById('btnDetailsRestart').style.display = hist ? 'inline-flex' : 'none';
     document.getElementById('btnDetailsContinue').textContent = hist
         ? `▶ Continuar T${hist.season} Ep ${hist.episodeNumber}`
-        : '▶ Assistir Temporada 1 Ep 1';
+        : '▶ Assistir Episódio 1';
     document.getElementById('btnDetailsFavorite').textContent = hist?.favorite ? '♥ Favoritado' : '♡ Favoritar';
     updateWatchedButtons();
     modal.style.display = 'flex';
@@ -833,7 +855,7 @@ async function loadDetailsEpisodes(season, audio, fallbackEpisodes = []) {
     const listEl = document.getElementById('detailsEpisodesList');
     listEl.innerHTML = '<p style="color: var(--text-muted);">Carregando episódios da temporada...</p>';
     let eps = [];
-    if (state.details.videoId) {
+    if (state.details.videoId && !String(state.details.videoId).startsWith('anichan_')) {
         try {
             const res = await fetch(`/api/episodes?id=${encodeURIComponent(state.details.videoId)}&season=${season}&audio=${encodeURIComponent(audio)}`);
             const data = await res.json();
@@ -959,6 +981,7 @@ async function openPlayerDirect(item, playUrl, season = 1, episodeNumber = 1, ep
         coverUrl: item.coverUrl || item.cover || '',
         currentUrl: state.player.episodeUrl,
         isSeries: state.player.isSeries,
+        isAnime: Boolean(item.isAnime || (item.url && item.url.includes('anichan.to'))),
         season,
         episodeNumber,
         episodeTitle: state.player.episodeTitle
@@ -974,7 +997,7 @@ async function openPlayerDirect(item, playUrl, season = 1, episodeNumber = 1, ep
                         state.player.seasons = sData.seasons;
                     }
                     const activeVid = state.details.videoId || state.player.videoId;
-                    if (activeVid && state.player.episodes.length === 0) {
+                    if (activeVid && !String(activeVid).startsWith('anichan_') && state.player.episodes.length === 0) {
                         const er = await fetch(`/api/episodes?id=${encodeURIComponent(activeVid)}&season=${season}&audio=${encodeURIComponent(state.details.audio || 'Dublado')}`);
                         const ed = await er.json();
                         if (Array.isArray(ed.episodes) && ed.episodes.length) {
@@ -1003,8 +1026,11 @@ async function openPlayerDirect(item, playUrl, season = 1, episodeNumber = 1, ep
         if (state.player.servers.length > 0) {
             loadServer(0);
         } else {
-            document.getElementById('playerLoadingText').textContent = 'Nenhum servidor direto retornado; abrindo página filtrada...';
-            document.getElementById('playerFrame').src = `/api/proxy?url=${encodeURIComponent(state.player.episodeUrl)}`;
+            document.getElementById('playerLoadingText').textContent = 'Carregando vídeo protegido sem anúncios...';
+            const frame = document.getElementById('playerFrame');
+            frame.src = state.player.episodeUrl.includes('anichan.to')
+                ? state.player.episodeUrl
+                : `/api/proxy?url=${encodeURIComponent(state.player.episodeUrl)}`;
             setTimeout(() => {
                 document.getElementById('playerLoadingOverlay').style.display = 'none';
             }, 900);
@@ -1038,9 +1064,12 @@ function loadServer(idx) {
     const srv = state.player.servers[idx];
     if (!srv) return;
     document.getElementById('playerLoadingOverlay').style.display = 'flex';
-    document.getElementById('playerLoadingText').textContent = `Carregando ${srv.name} sem anúncios...`;
+    document.getElementById('playerLoadingText').textContent = `Carregando ${srv.name} no sandbox sem popups...`;
     const frame = document.getElementById('playerFrame');
-    frame.src = `/api/proxy?url=${encodeURIComponent(srv.embedUrl)}`;
+    // Embeds externos diretos (Byse/MixDrop/Dood/AniChan) rodam nativamente no iframe com sandbox (bloqueando popups & redirects);
+    // somente links do próprio Pobreflix passam pelo /api/proxy devido ao X-Frame-Options: sameorigin.
+    const usesProxy = String(srv.embedUrl || '').toLowerCase().includes('pobreflixtv');
+    frame.src = usesProxy ? `/api/proxy?url=${encodeURIComponent(srv.embedUrl)}` : srv.embedUrl;
     frame.onload = () => {
         document.getElementById('playerLoadingOverlay').style.display = 'none';
     };

@@ -33,7 +33,7 @@ service cloud.firestore {
              (!('coverUrl' in data) || (data.coverUrl is string && data.coverUrl.size() <= 1000)) &&
              data.itemUrl is string && data.itemUrl.size() >= 1 && data.itemUrl.size() <= 1000 &&
              data.currentUrl is string && data.currentUrl.size() >= 1 && data.currentUrl.size() <= 1000 &&
-             data.mediaType is string && data.mediaType in ['movie', 'series'] &&
+             data.mediaType is string && data.mediaType in ['movie', 'series', 'anime'] &&
              data.season is int && data.season >= 1 && data.season <= 200 &&
              data.episodeNumber is int && data.episodeNumber >= 1 && data.episodeNumber <= 5000 &&
              (!('episodeTitle' in data) || (data.episodeTitle is string && data.episodeTitle.size() <= 200)) &&

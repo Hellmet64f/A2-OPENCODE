@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>A2 Miguel — Filmes e Séries no PC</title>
+    <title>A2 Miguel — Filmes, Séries e Animes no PC</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -31,6 +31,10 @@
                     <span class="nav-icon">📺</span>
                     <span>Todas as Séries</span>
                 </button>
+                <button class="nav-item" data-view="animes">
+                    <span class="nav-icon">⛩️</span>
+                    <span>Todos os Animes</span>
+                </button>
                 <button class="nav-item" data-view="history">
                     <span class="nav-icon">🕒</span>
                     <span>Histórico &amp; Já Vistos</span>
@@ -45,9 +49,9 @@
                 <div class="status-card adblock-card" id="btnOpenAdBlockModal">
                     <div class="status-card-header">
                         <span class="dot-emerald"></span>
-                        <strong>AdBlock 70+ Ativo</strong>
+                        <strong>AdBlock 100+ Ativo</strong>
                     </div>
-                    <p id="sidebarAdblockText">72+ regras • Auto-atualizável</p>
+                    <p id="sidebarAdblockText">101+ regras • Auto-atualizável</p>
                     <span class="status-pill" id="sidebarBlockedCount">0 bloqueios nesta sessão</span>
                 </div>
 
@@ -70,7 +74,7 @@
                     <input
                         type="text"
                         id="searchInput"
-                        placeholder="Buscar filmes ou séries em tempo real (Enter para busca completa)..."
+                        placeholder="Buscar filmes, séries ou animes em tempo real (Enter)..."
                         autocomplete="off"
                     >
                     <button type="button" class="search-clear" id="btnClearSearch" style="display: none;" title="Limpar busca">✕</button>
@@ -97,6 +101,7 @@
                     <button class="filter-pill active" data-type="all">Todos</button>
                     <button class="filter-pill" data-type="movie">🎬 Filmes</button>
                     <button class="filter-pill" data-type="series">📺 Séries</button>
+                    <button class="filter-pill" data-type="anime">⛩️ Animes</button>
                 </div>
             </div>
 
@@ -195,7 +200,7 @@
             <div class="player-title-info">
                 <div class="player-title-row">
                     <h2 id="playerTitle">Reproduzindo Vídeo</h2>
-                    <span class="badge-emerald small" id="playerAdblockPill">🛡️ AdBlock 70+</span>
+                    <span class="badge-emerald small" id="playerAdblockPill">🛡️ AdBlock 100+</span>
                 </div>
                 <span id="playerMeta">A2 Miguel • Modo Sem Anúncios</span>
             </div>
@@ -223,6 +228,8 @@
                     <iframe
                         id="playerFrame"
                         src="about:blank"
+                        sandbox="allow-scripts allow-same-origin allow-forms allow-presentation"
+                        referrerpolicy="no-referrer"
                         allowfullscreen
                         allow="autoplay; encrypted-media; picture-in-picture"
                     ></iframe>
@@ -317,13 +324,13 @@
         </div>
     </div>
 
-    <!-- Modal de Dados Gratuitos & AdBlock 70+ -->
+    <!-- Modal de Dados Gratuitos & AdBlock 100+ -->
     <div class="modal-overlay" id="dataModal" style="display: none;">
         <div class="dialog-window">
             <div class="window-titlebar">
                 <div class="titlebar-left">
                     <span>💾</span>
-                    <span class="titlebar-title">Dados Gratuitos, AdBlock 70+ &amp; Backup Celular</span>
+                    <span class="titlebar-title">Dados Gratuitos, AdBlock 100+ &amp; Backup Celular</span>
                 </div>
                 <button class="modal-close-btn small" id="btnCloseDataModal">✕</button>
             </div>
@@ -332,8 +339,8 @@
                 <div class="info-card">
                     <div class="info-card-row">
                         <div>
-                            <h4>🛡️ Motor AdBlock 70+ Auto-Atualizável</h4>
-                            <p id="modalAdblockStatus">72+ regras ativas • Bloqueia anúncios, popups e apostas</p>
+                            <h4>🛡️ Motor AdBlock 100+ Auto-Atualizável</h4>
+                            <p id="modalAdblockStatus">101+ regras ativas • Bloqueia anúncios, popups e apostas</p>
                         </div>
                         <button class="btn-emerald small" id="btnUpdateAdblockNow">🔄 Atualizar Regras Agora</button>
                     </div>

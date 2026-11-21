@@ -44,6 +44,7 @@ import com.example.model.WatchHistoryManager
 import com.example.network.AdBlockManager
 import com.example.network.SearchService
 import com.example.ui.AuthScreen
+import com.example.ui.GuestModePrefs
 import com.example.ui.NetflixHome
 import com.example.ui.PlayerScreen
 import com.example.ui.SearchScreen
@@ -60,6 +61,8 @@ import com.google.firebase.Firebase
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.auth.auth
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.json.JSONArray
@@ -80,7 +83,15 @@ class ScraperInterface(
                 val c = obj.optString("cover", "")
                 val u = obj.optString("url", "")
                 if (t.isNotBlank() && c.isNotBlank() && u.isNotBlank()) {
-                    list.add(Movie(t.trim(), c.trim(), SearchService.normalizeUrl(u)))
+                    val normalizedU = SearchService.normalizeUrl(u)
+                    list.add(
+                        Movie(
+                            title = t.trim(),
+                            coverUrl = SearchService.normalizeUrl(c),
+                            url = normalizedU,
+                            isAnime = normalizedU.contains("anichan.to") || normalizedU.contains("/animes/")
+                        )
+                    )
                 }
             }
             if (list.isNotEmpty()) onExtracted(list)
@@ -316,25 +327,44 @@ class MainActivity : ComponentActivity() {
         setContent {
             MyApplicationTheme {
                 var currentUser by remember { mutableStateOf<FirebaseUser?>(Firebase.auth.currentUser) }
+                var isGuestMode by remember {
+                    mutableStateOf(currentUser == null && GuestModePrefs.isGuestMode(this))
+                }
                 DisposableEffect(Unit) {
                     val listener = FirebaseAuth.AuthStateListener { auth ->
-                        currentUser = auth.currentUser
+                        val nextUser = auth.currentUser
+                        currentUser = nextUser
+                        if (nextUser != null) {
+                            GuestModePrefs.setGuestMode(this@MainActivity, false)
+                            isGuestMode = false
+                        }
                     }
                     Firebase.auth.addAuthStateListener(listener)
                     onDispose { Firebase.auth.removeAuthStateListener(listener) }
                 }
 
-                if (currentUser == null) {
+                if (currentUser == null && !isGuestMode) {
                     AuthScreen(
                         onAuthSuccess = {
+                            GuestModePrefs.setGuestMode(this@MainActivity, false)
+                            isGuestMode = false
                             currentUser = Firebase.auth.currentUser
+                        },
+                        onContinueAsGuest = {
+                            GuestModePrefs.setGuestMode(this@MainActivity, true)
+                            isGuestMode = true
                         }
                     )
                 } else {
-                    val uid = currentUser!!.uid
-                    key(uid) {
+                    val sessionKey = currentUser?.uid ?: "guest_local_session"
+                    key(sessionKey) {
                         AuthenticatedMainApp(
-                            user = currentUser!!,
+                            user = currentUser,
+                            isGuestMode = currentUser == null && isGuestMode,
+                            onSwitchToGoogleLogin = {
+                                GuestModePrefs.setGuestMode(this@MainActivity, false)
+                                isGuestMode = false
+                            },
                             onTriggerSeasonLoad = { season, audio -> loadSeasonInScraper(season, audio) }
                         )
                     }
@@ -346,19 +376,28 @@ class MainActivity : ComponentActivity() {
     @SuppressLint("SetJavaScriptEnabled")
     @Composable
     private fun AuthenticatedMainApp(
-        user: FirebaseUser,
+        user: FirebaseUser?,
+        isGuestMode: Boolean,
+        onSwitchToGoogleLogin: () -> Unit,
         onTriggerSeasonLoad: (Int, String) -> Unit
     ) {
         val context = LocalContext.current
-        val repository = remember(user.uid) { UserDataRepository(context) }
-        val userViewModel: UserDataViewModel = viewModel(
-            key = user.uid,
-            factory = UserDataViewModel.Factory(user.uid, repository)
-        )
+        val userViewModel: UserDataViewModel? = if (user != null) {
+            val repository = remember(user.uid) { UserDataRepository(context) }
+            viewModel(
+                key = user.uid,
+                factory = UserDataViewModel.Factory(user.uid, repository)
+            )
+        } else {
+            null
+        }
 
-        val historyState by userViewModel.historyState.collectAsStateWithLifecycle()
-        val prefsState by userViewModel.preferencesState.collectAsStateWithLifecycle()
-        val syncMessage by userViewModel.syncMessage.collectAsStateWithLifecycle()
+        val historyState by (userViewModel?.historyState?.collectAsStateWithLifecycle()
+            ?: remember { mutableStateOf<UiState<List<WatchHistoryItem>>>(UiState.Success(WatchHistoryManager.getHistory(context))) })
+        val prefsState by (userViewModel?.preferencesState?.collectAsStateWithLifecycle()
+            ?: remember { mutableStateOf<UiState<com.example.data.UserPreferencesDoc?>>(UiState.Success(null)) })
+        val syncMessage by (userViewModel?.syncMessage?.collectAsStateWithLifecycle()
+            ?: remember { mutableStateOf<String?>(null) })
 
         val adBlockRuleCount by AdBlockManager.ruleCountFlow.collectAsStateWithLifecycle()
         val adBlockBlockedSession by AdBlockManager.blockedSessionCount.collectAsStateWithLifecycle()
@@ -370,29 +409,60 @@ class MainActivity : ComponentActivity() {
             val msg = syncMessage
             if (!msg.isNullOrBlank()) {
                 Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
-                userViewModel.clearSyncMessage()
+                userViewModel?.clearSyncMessage()
             }
         }
 
         // Sync cloud history down into local cache and AppState whenever Firestore updates
-        LaunchedEffect(historyState) {
-            val loaded = (historyState as? UiState.Success)?.data
-            if (loaded != null && loaded.isNotEmpty()) {
+        LaunchedEffect(historyState, user?.uid) {
+            if (userViewModel == null) return@LaunchedEffect
+            val loaded = (historyState as? UiState.Success)?.data ?: return@LaunchedEffect
+            val pendingGuestSync = GuestModePrefs.hasPendingGuestSync(context)
+            val localOnly = WatchHistoryManager.getHistory(context)
+            if (pendingGuestSync && localOnly.isNotEmpty()) {
+                val cloudById = loaded.associateBy { it.id }
+                val mergedMap = linkedMapOf<String, WatchHistoryItem>()
+                (loaded + localOnly).forEach { item ->
+                    val existing = mergedMap[item.id]
+                    if (existing == null) {
+                        mergedMap[item.id] = item
+                    } else {
+                        val watched = (existing.watchedEpisodes + item.watchedEpisodes).distinct()
+                        val winner = if (item.timestamp >= existing.timestamp) item else existing
+                        mergedMap[item.id] = winner.copy(
+                            watchedEpisodes = watched,
+                            favorite = existing.favorite || item.favorite,
+                            completed = existing.completed || item.completed
+                        )
+                    }
+                }
+                val finalList = WatchHistoryManager.replaceHistory(context, mergedMap.values.toList())
+                GuestModePrefs.clearPendingGuestSync(context)
+                val unsynced = finalList.filter { item ->
+                    val c = cloudById[item.id]
+                    c == null || item.timestamp > c.timestamp
+                }
+                if (unsynced.isNotEmpty()) {
+                    userViewModel.syncLocalBatch(unsynced)
+                }
+                val st = currentState
+                if (st is AppState.HomeLoaded) {
+                    currentState = st.copy(watchHistory = finalList)
+                }
+            } else if (loaded.isNotEmpty()) {
                 val merged = WatchHistoryManager.replaceHistory(context, loaded)
                 val st = currentState
                 if (st is AppState.HomeLoaded) {
                     currentState = st.copy(watchHistory = merged)
                 }
-            } else if (loaded != null && loaded.isEmpty()) {
-                val localOnly = WatchHistoryManager.getHistory(context)
-                if (localOnly.isNotEmpty()) {
-                    userViewModel.syncLocalBatch(localOnly)
-                }
+            } else if (localOnly.isNotEmpty()) {
+                userViewModel.syncLocalBatch(localOnly)
             }
         }
 
         // Sync cloud preferences down into local managers
-        LaunchedEffect(prefsState) {
+        LaunchedEffect(prefsState, user?.uid) {
+            if (userViewModel == null) return@LaunchedEffect
             val p = (prefsState as? UiState.Success)?.data ?: return@LaunchedEffect
             ScreenZoomManager.saveZoomConfig(context, p.zoomScale.toFloat(), 0f, 0f, p.zoomPreset.uppercase())
             FocusCalibrationManager.saveCalibration(context, p.focusX.toFloat(), p.focusY.toFloat())
@@ -407,28 +477,39 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        // Fast OkHttp catalog fallback if hidden WebView takes >2.2s
+        // Carrega catálogo AniChan (Animes) em paralelo logo no início + fallback OkHttp caso WebView demore >2.2s
         LaunchedEffect(Unit) {
+            val aniDeferred = async { SearchService.fetchAniChanCatalog() }
             delay(2200)
+            val aniList = try { aniDeferred.await() } catch (_: Exception) { emptyList() }
             if (currentState is AppState.WebLoading) {
-                val okHttpMovies = SearchService.fetchPobreflixHomeCatalog()
+                val okHttpMovies = try { SearchService.fetchPobreflixHomeCatalog() } catch (_: Exception) { emptyList() }
+                val combined = (okHttpMovies + aniList).distinctBy { it.url }
                 val savedHistory = WatchHistoryManager.getHistory(context)
                 val recents = WatchHistoryManager.getRecentSearches(context)
-                if (okHttpMovies.isNotEmpty() && currentState is AppState.WebLoading) {
+                if (combined.isNotEmpty() && currentState is AppState.WebLoading) {
                     currentState = AppState.HomeLoaded(
-                        allMovies = okHttpMovies,
+                        allMovies = combined,
                         watchHistory = savedHistory,
                         recentSearches = recents
+                    )
+                }
+            } else if (aniList.isNotEmpty()) {
+                val cur = currentState
+                if (cur is AppState.HomeLoaded) {
+                    currentState = cur.copy(
+                        allMovies = (cur.allMovies + aniList).distinctBy { it.url }
                     )
                 }
             }
         }
 
         fun syncCurrentPreferences() {
+            val vm = userViewModel ?: return
             val zoom = ScreenZoomManager.getZoomConfig(context)
             val cal = FocusCalibrationManager.getCalibration(context)
             val recents = WatchHistoryManager.getRecentSearches(context)
-            userViewModel.savePreferences(
+            vm.savePreferences(
                 zoomPreset = zoom.preset,
                 zoomScale = zoom.scale.toDouble(),
                 focusX = cal.first.toDouble(),
@@ -441,7 +522,7 @@ class MainActivity : ComponentActivity() {
         fun saveAndSyncHistoryItem(item: WatchHistoryItem, markCurrentWatched: Boolean = true): List<WatchHistoryItem> {
             val updatedList = WatchHistoryManager.saveProgress(context, item, markCurrentWatched)
             updatedList.firstOrNull { it.id == item.id }?.let { finalItem ->
-                userViewModel.saveHistoryItem(finalItem)
+                userViewModel?.saveHistoryItem(finalItem)
             }
             return updatedList
         }
@@ -564,7 +645,7 @@ class MainActivity : ComponentActivity() {
                                                         var c = img.src || img.getAttribute('data-src') || img.getAttribute('data-lazy-src') || '';
                                                         var u = a.href;
                                                         if (t && c && u && c.indexOf('data:image') === -1) {
-                                                            if (u.indexOf('/filmes/') !== -1 || u.indexOf('/series/') !== -1 || u.indexOf('/episodios/') !== -1) {
+                                                            if (u.indexOf('/filmes/') !== -1 || u.indexOf('/series/') !== -1 || u.indexOf('/episodios/') !== -1 || u.indexOf('/animes/') !== -1) {
                                                                 if (!items.find(function(i) { return i.url === u; })) {
                                                                     items.push({ title: t.trim(), cover: c, url: u });
                                                                 }
@@ -587,7 +668,7 @@ class MainActivity : ComponentActivity() {
                                 )
                             }
                         }
-                        loadUrl("https://www.pobreflixtv.delivery/")
+                        loadUrl("https://www.pobreflixtv.codes/")
                     }
                 }
             )
@@ -638,7 +719,7 @@ class MainActivity : ComponentActivity() {
                                 letterSpacing = 2.sp
                             )
                             Text(
-                                text = "Filmes e Séries • AdBlock $adBlockRuleCount+ Ativo",
+                                text = "Filmes, Séries e Animes • AdBlock $adBlockRuleCount+ Ativo",
                                 color = EmeraldAdBlock,
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.Bold
@@ -659,7 +740,7 @@ class MainActivity : ComponentActivity() {
                         SearchScreen(
                             state = state,
                             onMovieClick = { movie ->
-                                if (movie.isSeries) {
+                                if (movie.isSeries || movie.isAnime) {
                                     currentState = AppState.SeriesDetails(series = movie, previousState = state)
                                 } else {
                                     val historyItem = WatchHistoryItem(
@@ -668,6 +749,7 @@ class MainActivity : ComponentActivity() {
                                         coverUrl = movie.coverUrl,
                                         currentUrl = movie.url,
                                         isSeries = false,
+                                        isAnime = movie.isAnime,
                                         season = 1,
                                         episodeNumber = 1,
                                         episodeTitle = movie.title
@@ -683,25 +765,30 @@ class MainActivity : ComponentActivity() {
                                     )
                                 }
                             },
-                            onSearch = { query ->
+                            onSearch = { query, saveRecent ->
                                 val trimmed = query.trim()
+                                val latest = currentState as? AppState.HomeLoaded ?: state
                                 if (trimmed.isNotBlank()) {
-                                    val updatedRecents = WatchHistoryManager.addRecentSearch(context, trimmed)
-                                    currentState = state.copy(
+                                    val updatedRecents = if (saveRecent) {
+                                        WatchHistoryManager.addRecentSearch(context, trimmed)
+                                    } else {
+                                        latest.recentSearches
+                                    }
+                                    currentState = latest.copy(
                                         isLoadingSearch = true,
                                         isSearching = true,
                                         searchQuery = trimmed,
                                         recentSearches = updatedRecents
                                     )
-                                    syncCurrentPreferences()
+                                    if (saveRecent) syncCurrentPreferences()
                                     lifecycleScope.launch {
-                                        val remote = SearchService.searchPobreflix(trimmed)
-                                        val localMatches = state.allMovies.filter {
+                                        val remote = SearchService.searchAll(trimmed)
+                                        val localMatches = latest.allMovies.filter {
                                             it.title.contains(trimmed, ignoreCase = true)
                                         }
                                         val combined = (remote + localMatches).distinctBy { it.url }
                                         val cur = currentState
-                                        if (cur is AppState.HomeLoaded) {
+                                        if (cur is AppState.HomeLoaded && cur.searchQuery == trimmed) {
                                             currentState = cur.copy(
                                                 searchResults = combined,
                                                 isLoadingSearch = false
@@ -709,7 +796,7 @@ class MainActivity : ComponentActivity() {
                                         }
                                     }
                                 } else {
-                                    currentState = state.copy(
+                                    currentState = latest.copy(
                                         isSearching = true,
                                         searchQuery = "",
                                         searchResults = emptyList(),
@@ -729,14 +816,15 @@ class MainActivity : ComponentActivity() {
                     } else {
                         NetflixHome(
                             state = state,
-                            userEmail = user.email,
-                            userName = user.displayName,
+                            userEmail = user?.email,
+                            userName = user?.displayName,
+                            isGuestMode = isGuestMode,
                             adBlockRuleCount = adBlockRuleCount,
                             adBlockBlockedSession = adBlockBlockedSession,
                             adBlockUpdating = adBlockUpdating,
                             adBlockAutoUpdate = adBlockAutoUpdate,
                             onMovieClick = { movie ->
-                                if (movie.isSeries) {
+                                if (movie.isSeries || movie.isAnime) {
                                     currentState = AppState.SeriesDetails(series = movie, previousState = state)
                                 } else {
                                     val historyItem = WatchHistoryItem(
@@ -745,6 +833,7 @@ class MainActivity : ComponentActivity() {
                                         coverUrl = movie.coverUrl,
                                         currentUrl = movie.url,
                                         isSeries = false,
+                                        isAnime = movie.isAnime,
                                         season = 1,
                                         episodeNumber = 1,
                                         episodeTitle = movie.title
@@ -766,16 +855,20 @@ class MainActivity : ComponentActivity() {
                             onRefreshCatalog = {
                                 currentState = state.copy(isRefreshingCatalog = true)
                                 lifecycleScope.launch {
-                                    val fresh = SearchService.fetchPobreflixHomeCatalog()
+                                    val (freshPf, freshAni) = coroutineScope {
+                                        val pfDef = async { SearchService.fetchPobreflixHomeCatalog() }
+                                        val aniDef = async { SearchService.fetchAniChanCatalog() }
+                                        pfDef.await() to aniDef.await()
+                                    }
                                     val cur = currentState
                                     if (cur is AppState.HomeLoaded) {
                                         currentState = cur.copy(
-                                            allMovies = (fresh + cur.allMovies).distinctBy { it.url },
+                                            allMovies = (freshPf + freshAni + cur.allMovies).distinctBy { it.url },
                                             isRefreshingCatalog = false
                                         )
                                     }
                                 }
-                                scraperWebViewRef?.loadUrl("https://www.pobreflixtv.delivery/")
+                                scraperWebViewRef?.loadUrl("https://www.pobreflixtv.codes/")
                             },
                             onOpenSearch = {
                                 currentState = state.copy(isSearching = true)
@@ -806,9 +899,14 @@ class MainActivity : ComponentActivity() {
                                 )
                             },
                             onRestartHistoryItem = { item ->
-                                if (item.isSeries) {
-                                    // Open details or jump directly to T1 E1 via metadata fetch
-                                    val m = Movie(title = item.title, coverUrl = item.coverUrl, url = item.id, isSeries = true)
+                                if (item.isSeries || item.isAnime) {
+                                    val m = Movie(
+                                        title = item.title,
+                                        coverUrl = item.coverUrl,
+                                        url = item.id,
+                                        isAnime = item.isAnime,
+                                        isSeries = true
+                                    )
                                     currentState = AppState.SeriesDetails(series = m, previousState = state, selectedSeason = 1)
                                 } else {
                                     val restarted = item.copy(progressSeconds = 0L, completed = false)
@@ -828,7 +926,8 @@ class MainActivity : ComponentActivity() {
                                     title = item.title,
                                     coverUrl = item.coverUrl,
                                     url = item.id,
-                                    isSeries = item.isSeries
+                                    isAnime = item.isAnime,
+                                    isSeries = item.isSeries || item.isAnime
                                 )
                                 currentState = AppState.SeriesDetails(
                                     series = m,
@@ -838,22 +937,22 @@ class MainActivity : ComponentActivity() {
                             },
                             onToggleFavoriteMovie = { movie ->
                                 val (updatedList, updatedItem) = WatchHistoryManager.toggleFavorite(context, movie)
-                                userViewModel.saveHistoryItem(updatedItem)
+                                userViewModel?.saveHistoryItem(updatedItem)
                                 currentState = state.copy(watchHistory = updatedList)
                             },
                             onToggleCompletedHistory = { item ->
                                 val (updatedList, updatedItem) = WatchHistoryManager.markCompleted(context, item.id, !item.completed)
-                                if (updatedItem != null) userViewModel.saveHistoryItem(updatedItem)
+                                if (updatedItem != null) userViewModel?.saveHistoryItem(updatedItem)
                                 currentState = state.copy(watchHistory = updatedList)
                             },
                             onRemoveHistoryItem = { item ->
                                 val updated = WatchHistoryManager.removeItem(context, item.id)
-                                userViewModel.removeHistoryItem(item.id)
+                                userViewModel?.removeHistoryItem(item.id)
                                 currentState = state.copy(watchHistory = updated)
                             },
                             onClearHistory = {
                                 val updated = WatchHistoryManager.clearAll(context)
-                                userViewModel.clearAllHistory()
+                                userViewModel?.clearAllHistory()
                                 currentState = state.copy(watchHistory = updated)
                             },
                             onToggleAdBlockAutoUpdate = { enabled ->
@@ -868,16 +967,17 @@ class MainActivity : ComponentActivity() {
                                 }
                             },
                             onSyncCloudNow = {
-                                userViewModel.syncLocalBatch(state.watchHistory)
+                                userViewModel?.syncLocalBatch(state.watchHistory)
                                 syncCurrentPreferences()
                             },
                             onImportJsonBackup = { jsonText ->
                                 val merged = WatchHistoryManager.importFromJson(context, jsonText)
                                 val recents = WatchHistoryManager.getRecentSearches(context)
                                 currentState = state.copy(watchHistory = merged, recentSearches = recents)
-                                userViewModel.syncLocalBatch(merged)
+                                userViewModel?.syncLocalBatch(merged)
                                 syncCurrentPreferences()
                             },
+                            onSwitchToGoogleLogin = onSwitchToGoogleLogin,
                             onSignOut = {
                                 signOutUser(credentialManager, lifecycleScope)
                             }
@@ -925,6 +1025,7 @@ class MainActivity : ComponentActivity() {
                             coverUrl = state.series.coverUrl,
                             currentUrl = ep.url,
                             isSeries = true,
+                            isAnime = state.series.isAnime,
                             season = ep.season,
                             episodeNumber = ep.number,
                             episodeTitle = ep.title
@@ -970,7 +1071,7 @@ class MainActivity : ComponentActivity() {
                         },
                         onToggleFavorite = {
                             val (updatedList, updatedItem) = WatchHistoryManager.toggleFavorite(context, state.series)
-                            userViewModel.saveHistoryItem(updatedItem)
+                            userViewModel?.saveHistoryItem(updatedItem)
                             currentState = state.copy(previousState = state.previousState.copy(watchHistory = updatedList))
                         },
                         onSeasonSelect = { season ->
@@ -1034,7 +1135,7 @@ class MainActivity : ComponentActivity() {
                         playingState = state,
                         watchedEpisodeKeys = seriesHistory?.watchedEpisodes.orEmpty().toSet(),
                         onHistoryProgressSaved = { item ->
-                            userViewModel.saveHistoryItem(item)
+                            userViewModel?.saveHistoryItem(item)
                         },
                         onPreferencesChanged = { _, _, _, _ ->
                             syncCurrentPreferences()

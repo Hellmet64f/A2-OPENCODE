@@ -44,8 +44,16 @@ class A2MiguelCoreUnitTest {
         assertFalse(AdBlockManager.isBlockedUrl("https://www.pobreflixtv.codes/filmes/teste"))
         assertFalse(AdBlockManager.isBlockedUrl("https://anichan.to/anime/21/one-piece/1"))
         assertFalse(AdBlockManager.isBlockedUrl("https://bysebuho.com/e/abc123"))
+        assertFalse(AdBlockManager.isBlockedUrl("https://playmogo.com/e/b4g4ep3us0g0"))
+        assertFalse(AdBlockManager.isBlockedUrl("https://i.doodcdn.io/css/embed.css"))
+        assertFalse(AdBlockManager.isBlockedUrl("https://imgds.net/splash/xtxt3iw9pcbqhs9j.jpg"))
+        assertFalse(AdBlockManager.isBlockedUrl("https://challenges.cloudflare.com/turnstile/v0/api.js"))
+        assertFalse(AdBlockManager.isBlockedUrl("https://w9iuf7sh.mxcontent.net/v2/tok1win99.mp4?s=abc"))
+        assertFalse(AdBlockManager.isBlockedUrl("https://cdn.example.com/streams/casino_royale.m3u8"))
+        assertTrue(AdBlockManager.isBlockedUrl("https://belygylykijife.com/api/v1/direct/46aa3f98"))
 
         assertTrue(AdBlockManager.isAllowedTopFrameNavigation("https://bysebuho.com/e/abc123", "https://bysebuho.com/e/abc123?t=1"))
+        assertTrue(AdBlockManager.isAllowedTopFrameNavigation("https://playmogo.com/e/b4g4ep3us0g0", "https://playmogo.com/dood?op=validate&gc_response=xyz"))
         assertTrue(AdBlockManager.isAllowedTopFrameNavigation("https://anichan.to/anime/21/one-piece/1", "https://anichan.to/anime/21/one-piece/2"))
         assertFalse(AdBlockManager.isAllowedTopFrameNavigation("https://mxdrop.click/e/abc123", "https://qq.soakysecrets.com/offer"))
 

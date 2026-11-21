@@ -593,6 +593,11 @@ fun PlayerScreen(
                                 window.alert = function() {};
                                 window.confirm = function() { return true; };
                                 window.prompt = function() { return null; };
+                                try {
+                                    window.minimalUserResponseInMiliseconds = 99999999;
+                                    window.check = function() {};
+                                    console.clear = function() {};
+                                } catch(e) {}
                                 if (!window.__a2ShieldInstalled) {
                                     window.__a2ShieldInstalled = true;
                                     var origAdd = EventTarget.prototype.addEventListener;
@@ -601,7 +606,7 @@ fun PlayerScreen(
                                             if ((type === 'click' || type === 'mousedown' || type === 'touchstart' || type === 'pointerdown') &&
                                                 (this === window || this === document || this === document.body || this === document.documentElement)) {
                                                 var fnStr = listener ? listener.toString() : '';
-                                                if (/window\.open|pop|_blank|location\.href|location\.replace|top\.location|adserver|redirect/i.test(fnStr)) {
+                                                if (/window\.open|wpn63s|dtnoppu|perpage|lastTimestamp|popunder|_blank|location\.href|location\.replace|top\.location|adserver|redirect|belygylykijife|soakysecrets/i.test(fnStr)) {
                                                     return;
                                                 }
                                             }
@@ -609,11 +614,35 @@ fun PlayerScreen(
                                         return origAdd.call(this, type, listener, options);
                                     };
                                 }
+                                function isProtectedNode(el) {
+                                    if (!el) return true;
+                                    if (el === document.documentElement || el === document.body) return true;
+                                    var tag = (el.tagName || '').toUpperCase();
+                                    if (tag === 'VIDEO' || tag === 'IFRAME' || tag === 'CANVAS' || tag === 'BUTTON') return true;
+                                    var id = (el.id || '').toLowerCase();
+                                    if (id === 'root' || id === 'player' || id === 'view' || id === 'video_player' || id === 'videojs' || id === 'os_player' || id === 'videoplayerwrap' || id === 'turnstile-container') return true;
+                                    var cls = typeof el.className === 'string' ? el.className.toLowerCase() : '';
+                                    if (cls.indexOf('vjs-') !== -1 || cls.indexOf('plyr') !== -1 || cls.indexOf('video-js') !== -1 || cls.indexOf('captcha-player') !== -1) return true;
+                                    if (el.closest && el.closest('.captcha-player, .vjs-control-bar, .plyr__controls')) return true;
+                                    if (el.querySelector && el.querySelector('video, iframe, canvas, .video-js, #video_player, #videojs, #os_player, .plyr, .vjs-control-bar, .plyr__controls, .vjs-big-play-button, #turnstile-container')) {
+                                        return true;
+                                    }
+                                    return false;
+                                }
                                 function sweepOverlays() {
                                     try {
+                                        try {
+                                            if (document.body && document.body.onclick && /open|pop|http/i.test(document.body.onclick.toString())) {
+                                                document.body.onclick = null;
+                                            }
+                                            if (document.onclick && /open|pop|http/i.test(document.onclick.toString())) {
+                                                document.onclick = null;
+                                            }
+                                        } catch(e) {}
                                         document.querySelectorAll('a[target="_blank"]').forEach(function(a) {
                                             var href = (a.getAttribute('href') || '').toLowerCase();
-                                            if (href.indexOf('http') === 0 && !/pobreflix|anichan|byse|mixdrop|mxdrop|streamtape|playmogo|dood/.test(href)) {
+                                            var isExternalOrRedirect = href.indexOf('http') === 0 || href.indexOf('//') === 0 || href.indexOf('/go/') !== -1 || href.indexOf('/out/') !== -1;
+                                            if (isExternalOrRedirect && !/pobreflix|anichan|byse|mixdrop|mxdrop|streamtape|playmogo|dood|d000d|ds2play|dsvplay|myvidplay|filemoon|vidhide|streamwish/.test(href)) {
                                                 a.remove();
                                             } else {
                                                 a.setAttribute('target', '_self');
@@ -621,24 +650,26 @@ fun PlayerScreen(
                                         });
                                         var vw = window.innerWidth || 360;
                                         var vh = window.innerHeight || 640;
-                                        document.querySelectorAll('div, a, section, aside, ins').forEach(function(el) {
+                                        document.querySelectorAll('div, a, section, aside, ins, span').forEach(function(el) {
                                             try {
-                                                if (el.querySelector('video') || el.tagName === 'VIDEO') return;
-                                                var idCls = ((el.id || '') + ' ' + (el.className || '')).toLowerCase();
-                                                if (/(popunder|popup-ad|ad-overlay|banner-ad|adsbox|tigrinho|casino|cassino|aposta)/.test(idCls)) {
+                                                if (isProtectedNode(el)) return;
+                                                var idCls = ((el.id || '') + ' ' + (typeof el.className === 'string' ? el.className : '')).toLowerCase();
+                                                if (/(popunder|popup-ad|ad-overlay|banner-ad|adsbox|adsbygoogle|tigrinho|casino|cassino|aposta)/.test(idCls)) {
                                                     el.remove();
                                                     return;
                                                 }
                                                 var st = window.getComputedStyle(el);
                                                 var z = parseInt(st.zIndex, 10) || 0;
-                                                if ((st.position === 'fixed' || st.position === 'absolute') && z >= 900) {
+                                                if ((st.position === 'fixed' || st.position === 'absolute') && z >= 5) {
                                                     var rect = el.getBoundingClientRect();
-                                                    var coversLarge = rect.width >= vw * 0.75 && rect.height >= vh * 0.6;
-                                                    var looksInvisible = parseFloat(st.opacity) < 0.08 || st.backgroundColor === 'transparent' || st.backgroundColor === 'rgba(0, 0, 0, 0)';
-                                                    var hasControls = el.querySelector('button, input, video, .vjs-control-bar, .plyr__controls');
-                                                    if (coversLarge && looksInvisible && !hasControls) {
+                                                    var coversLarge = rect.width >= vw * 0.55 && rect.height >= vh * 0.45;
+                                                    var looksInvisible = parseFloat(st.opacity) < 0.1 || st.backgroundColor === 'transparent' || st.backgroundColor === 'rgba(0, 0, 0, 0)';
+                                                    var isAnchorOverlay = el.tagName === 'A' && coversLarge;
+                                                    var hasControls = el.querySelector('button, input, select, video, iframe, .vjs-control-bar, .plyr__controls');
+                                                    if ((coversLarge && looksInvisible && !hasControls) || isAnchorOverlay) {
                                                         el.style.pointerEvents = 'none';
                                                         el.style.display = 'none';
+                                                        try { el.remove(); } catch(_) {}
                                                     }
                                                 }
                                             } catch(e) {}
@@ -679,20 +710,65 @@ fun PlayerScreen(
                             override fun onPageFinished(view: WebView?, url: String?) {
                                 super.onPageFinished(view, url)
                                 isLoadingPage = false
-                                view?.postDelayed({ dispatchAccuratePlayClick(focusXRatio, focusYRatio) }, 800)
-                                view?.postDelayed({ dispatchAccuratePlayClick(focusXRatio, focusYRatio) }, 2200)
+                                view?.postDelayed({
+                                    view.evaluateJavascript(
+                                        """
+                                        (function() {
+                                            try {
+                                                var captcha = document.querySelector('.captcha-player, #turnstile-container, iframe[src*="challenges.cloudflare.com"]');
+                                                if (captcha) {
+                                                    var cst = window.getComputedStyle(captcha);
+                                                    if (cst && cst.display !== 'none' && cst.visibility !== 'hidden') return;
+                                                }
+                                                var alreadyPlaying = false;
+                                                document.querySelectorAll('video').forEach(function(v) {
+                                                    if (!v.paused && !v.ended && v.readyState > 2) alreadyPlaying = true;
+                                                });
+                                                if (alreadyPlaying) return;
+                                                document.querySelectorAll('video').forEach(function(vid) {
+                                                    try {
+                                                        vid.muted = false;
+                                                        var p = vid.play();
+                                                        if (p && p.catch) p.catch(function() { vid.muted = true; vid.play(); });
+                                                    } catch(e) {}
+                                                });
+                                                var btns = document.querySelectorAll('.vjs-big-play-button, .play-btn, .btn-play, #play, .plyr__control--overlaid');
+                                                btns.forEach(function(b) { try { b.click(); } catch(e){} });
+                                            } catch(e) {}
+                                        })();
+                                        """.trimIndent(),
+                                        null
+                                    )
+                                }, 900)
+
+                                val isDirectEmbed = (url ?: "").lowercase().let { u ->
+                                    u.contains("playmogo") || u.contains("dood") || u.contains("d000d") ||
+                                        u.contains("ds2play") || u.contains("dsvplay") || u.contains("myvidplay") ||
+                                        u.contains("byse") || u.contains("mxdrop") || u.contains("mixdrop") ||
+                                        u.contains("streamtape") || u.contains("filemoon") || u.contains("vidhide") ||
+                                        u.contains("streamwish") || u.contains("/e/")
+                                }
+                                val cinemaCss = if (isDirectEmbed) {
+                                    "html, body { margin:0!important; padding:0!important; width:100%!important; height:100%!important; max-width:100vw!important; max-height:100vh!important; overflow:hidden!important; background:#000!important; color:#fff!important; } " +
+                                        "ins.adsbygoogle, .adsbygoogle, .floating-ads, .popunder, [class*=\"popunder\"], #popunder, .popup-ad, .ad-overlay { display:none!important; pointer-events:none!important; } " +
+                                        "#videoPlayerWrap, #os_player, #video_player, .video-js, #videojs, .plyr, #root { width:100%!important; height:100%!important; max-width:100%!important; max-height:100%!important; position:relative!important; } " +
+                                        "video, .video-js .vjs-tech { width:100%!important; height:100%!important; max-width:100%!important; max-height:100%!important; object-fit:contain!important; display:block!important; visibility:visible!important; opacity:1!important; }"
+                                } else {
+                                    "html, body { margin:0!important; padding:0!important; background:#000!important; color:#fff!important; } " +
+                                        "header, footer, nav, .site-header, .site-footer, #ipsLayout_header, #ipsLayout_footer, .sidebar, #comments, .comments, .floating-ads, ins.adsbygoogle, .adsbygoogle, [class*=\"popunder\"], .popup-ad, .ad-overlay { display:none!important; pointer-events:none!important; } " +
+                                        "#view, #player, .player-area { width:100%!important; max-width:100%!important; border:none!important; } " +
+                                        "video { width:100%!important; max-width:100%!important; object-fit:contain!important; display:block!important; visibility:visible!important; } " +
+                                        "iframe:not([width=\"1\"]):not([height=\"1\"]):not([style*=\"visibility: hidden\"]):not([style*=\"visibility:hidden\"]) { width:100%!important; max-width:100%!important; border:none!important; }"
+                                }
                                 view?.evaluateJavascript(
                                     """
                                     $shieldJs
                                     (function() {
                                         var oldStyle = document.getElementById('inapp-cinema-style');
                                         if (oldStyle) oldStyle.remove();
-                                        var css = 'html, body { margin:0!important; padding:0!important; background:#000!important; color:#fff!important; } ' +
-                                            'header, footer, nav, .site-header, .site-footer, #ipsLayout_header, #ipsLayout_footer, .sidebar, #comments, .comments, .ads, .banner, .floating-ads, [id*="ad-"], [class*="popup"], [class*="popunder"], ins.adsbygoogle { display:none!important; pointer-events:none!important; } ' +
-                                            '#view, #player, .player-area, iframe, video { width:100%!important; max-width:100%!important; min-height:260px!important; border:none!important; }';
                                         var st = document.createElement('style');
                                         st.id = 'inapp-cinema-style';
-                                        st.innerHTML = css;
+                                        st.textContent = ${org.json.JSONObject.quote(cinemaCss)};
                                         if (document.head) document.head.appendChild(st);
                                     })();
                                     """.trimIndent(),
@@ -724,7 +800,19 @@ fun PlayerScreen(
                                 val u = request?.url?.toString().orEmpty()
                                 if (AdBlockManager.isBlockedUrl(u)) {
                                     AdBlockManager.recordBlocked()
-                                    return WebResourceResponse("application/javascript", "utf-8", ByteArrayInputStream("/* blocked */".toByteArray()))
+                                    val lowerPath = u.lowercase().substringBefore("?").substringBefore("#")
+                                    return if (lowerPath.endsWith(".js")) {
+                                        WebResourceResponse("application/javascript", "utf-8", ByteArrayInputStream("/* blocked */".toByteArray()))
+                                    } else {
+                                        WebResourceResponse(
+                                            "text/plain",
+                                            "utf-8",
+                                            204,
+                                            "No Content",
+                                            mapOf("Access-Control-Allow-Origin" to "*"),
+                                            ByteArrayInputStream(ByteArray(0))
+                                        )
+                                    }
                                 }
                                 return super.shouldInterceptRequest(view, request)
                             }

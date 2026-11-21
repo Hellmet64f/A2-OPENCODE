@@ -47,7 +47,7 @@ $Script:BaselineAdRules = @(
     "oldnessdernly.qpon", "parklogic.com", "sedoparking.com", "parkingcrew.net", "bodis.com",
     "pushwoosh.com", "onesignal.com", "hotjar.com", "histats.com", "amung.us", "whos.amung.us",
     "adf.ly", "ouo.io", "shorte.st", "linkvertise.com", "chaturbate.com", "stripchat.com",
-    "livejasmin.com", "xads.js", "popunder"
+    "livejasmin.com", "belygylykijife.com", "proudfisherman.com", "glaringgoalie.com", "xads.js", "popunder"
 )
 
 $Script:AdRules = New-Object System.Collections.Generic.HashSet[string]
@@ -92,7 +92,7 @@ function Update-AdBlockRules {
                     $dom = $parts[0].TrimStart("|").Split("^")[0]
                 }
                 if ($dom -and $dom -ne "localhost" -and $dom.Contains(".") -and $dom.Length -ge 4 -and $dom.Length -le 100) {
-                    if ($dom -notmatch "pobreflixtv|anichan|anilist|tmdb\.org|byse|mixdrop|mxdrop|streamtape|playmogo|googleapis|gstatic") {
+                    if ($dom -notmatch "pobreflixtv|anichan|anilist|tmdb\.org|byse|bysesuk|mixdrop|mxdrop|mxcontent|mxdcontent|streamtape|playmogo|dood|d000d|d0000d|ds2play|dsvplay|myvidplay|vide0|filemoon|vidhide|streamwish|googleapis|gstatic|cloudflare") {
                         if ($Script:AdRules.Add($dom)) {
                             [void]$added.Add($dom)
                         }
@@ -654,9 +654,20 @@ while ($listener.IsListening) {
 
             $blocked = $false
             $lowerUrl = $targetUrl.ToLowerInvariant()
-            if (-not ($lowerUrl -match "pobreflixtv|anichan|byse|mixdrop|mxdrop|streamtape|playmogo")) {
+            $targetHost = ""
+            try { $targetHost = ([System.Uri]$targetUrl).Host.ToLowerInvariant() } catch {}
+            $isMediaAsset = ($lowerUrl.Split('?')[0].Split('#')[0] -match '\.(mp4|m3u8|ts|m4s|mpd|webm|vtt|srt|woff|woff2|ttf|css)$')
+            $isTrustedHost = $targetHost -match "pobreflixtv|anichan|byse|bysesuk|mixdrop|mxdrop|mxcontent|mxdcontent|streamtape|playmogo|dood|d000d|d0000d|ds2play|dsvplay|myvidplay|vide0|filemoon|vidhide|streamwish"
+            if (-not $isMediaAsset -and $lowerUrl -match "/xads\.js|/adblock\.js|popunder|onclick\.js|/vast\.|/vpaid\.|parklogic|sedoparking") {
+                $blocked = $true
+            }
+            if (-not $blocked -and -not $isTrustedHost -and $targetHost) {
                 foreach ($rule in $Script:AdRules) {
-                    if ($lowerUrl.Contains($rule)) { $blocked = $true; break }
+                    if ($rule.Contains(".")) {
+                        if ($targetHost -eq $rule -or $targetHost.EndsWith(".$rule")) { $blocked = $true; break }
+                    } elseif ($targetHost.Contains($rule)) {
+                        $blocked = $true; break
+                    }
                 }
             }
             if ($blocked) {
@@ -680,13 +691,13 @@ while ($listener.IsListening) {
                 }
 
                 # Remove scripts de anúncios conhecidos, trackers e popup handlers
-                $html = [System.Text.RegularExpressions.Regex]::Replace($html, '<script[^>]+src=["''][^"'']*(googlesyndication|doubleclick|popads|popcash|adsterra|monetag|propeller|exoclick|parklogic|sedoparking|histats|amung\.us|taboola|outbrain|soakysecrets|mdstats\.info|xads\.js|adblock\.js|onclick|1xbet|betano|bet365|tigrinho)[^"'']*["''][^>]*>\s*</script>', '', [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
+                $html = [System.Text.RegularExpressions.Regex]::Replace($html, '<script[^>]+src=["''][^"'']*(googlesyndication|doubleclick|popads|popcash|adsterra|monetag|propeller|exoclick|parklogic|sedoparking|histats|amung\.us|taboola|outbrain|soakysecrets|mdstats\.info|belygylykijife|proudfisherman|glaringgoalie|xads\.js|adblock\.js|onclick|1xbet|betano|bet365|tigrinho)[^"'']*["''][^>]*>\s*</script>', '', [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
                 $html = [System.Text.RegularExpressions.Regex]::Replace($html, 'target=["'']_blank["'']', 'target="_self"', [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
                 $Script:BlockedCount++
 
                 $uriObj = [System.Uri]$targetUrl
                 $baseTag = "<base href=`"$($uriObj.Scheme)://$($uriObj.Authority)/`">"
-                $shieldScript = "<script>(function(){try{Object.defineProperty(window,'open',{value:function(){return null;},writable:false,configurable:false});}catch(e){window.open=function(){return null;};}try{Object.defineProperty(window,'onbeforeunload',{set:function(){},get:function(){return null;}});}catch(e){}var _origAdd=EventTarget.prototype.addEventListener;EventTarget.prototype.addEventListener=function(t,fn,o){if((this===document||this===window)&&(t==='click'||t==='mousedown'||t==='touchstart')&&fn&&fn.toString().indexOf('open')!==-1){return;}return _origAdd.call(this,t,fn,o);};setInterval(function(){document.querySelectorAll('a[target=""_blank""],iframe[src*=""ads""],div[style*=""z-index: 2147483""],div[style*=""z-index:2147483""]').forEach(function(el){if(el.tagName==='A'){el.removeAttribute('target');}else{el.remove();}});},900);})();</script>"
+                $shieldScript = "<style>html,body,#videoPlayerWrap,#os_player,#video_player,.video-js,#videojs{width:100%!important;height:100%!important;margin:0!important;padding:0!important;overflow:hidden!important;background:#000!important;}video,.video-js .vjs-tech{width:100%!important;height:100%!important;object-fit:contain!important;display:block!important;visibility:visible!important;}</style><script>(function(){try{Object.defineProperty(window,'open',{value:function(){return null;},writable:false,configurable:false});}catch(e){window.open=function(){return null;};}try{window.minimalUserResponseInMiliseconds=99999999;window.check=function(){};}catch(e){}try{Object.defineProperty(window,'onbeforeunload',{set:function(){},get:function(){return null;}});}catch(e){}var _origAdd=EventTarget.prototype.addEventListener;EventTarget.prototype.addEventListener=function(t,fn,o){if((this===document||this===window||this===document.body)&&(t==='click'||t==='mousedown'||t==='touchstart')&&fn&&/open|wpn63s|dtnoppu|popunder|belygylykijife|soakysecrets/i.test(fn.toString())){return;}return _origAdd.call(this,t,fn,o);};function isSafe(el){if(!el||el===document.body||el===document.documentElement)return true;var tag=(el.tagName||'').toUpperCase();if(tag==='VIDEO'||tag==='IFRAME'||tag==='BUTTON')return true;var cls=typeof el.className==='string'?el.className.toLowerCase():'';if(cls.indexOf('vjs-')!==-1||cls.indexOf('plyr')!==-1||cls.indexOf('captcha-player')!==-1)return true;return Boolean(el.querySelector&&el.querySelector('video,iframe,.video-js,#video_player,.plyr'));}setInterval(function(){var vw=window.innerWidth||800,vh=window.innerHeight||500;document.querySelectorAll('a[target=""_blank""],iframe[src*=""ads""],div,a').forEach(function(el){if(el.tagName==='A'&&el.getAttribute('target')==='_blank'){el.removeAttribute('target');}if(isSafe(el))return;var st=window.getComputedStyle(el),z=parseInt(st.zIndex,10)||0;if((st.position==='fixed'||st.position==='absolute')&&z>=5){var r=el.getBoundingClientRect();if(r.width>=vw*0.55&&r.height>=vh*0.45&&(parseFloat(st.opacity)<0.1||st.backgroundColor==='transparent'||st.backgroundColor==='rgba(0, 0, 0, 0)'||el.tagName==='A')){el.style.pointerEvents='none';el.style.display='none';}}});},900);})();</script>"
 
                 if ($html -match "(?i)<head[^>]*>") {
                     $html = [System.Text.RegularExpressions.Regex]::Replace($html, "(?i)(<head[^>]*>)", "`$1$baseTag$shieldScript", 1)

@@ -983,15 +983,19 @@ body {
     position: relative;
     overflow: hidden;
     background: #000;
+    min-height: 0;
 }
 
 .video-frame-wrapper {
+    position: absolute;
+    inset: 0;
     width: 100%;
     height: 100%;
     transition: transform 0.2s ease-out;
 }
 
 .video-frame-wrapper iframe {
+    display: block;
     width: 100%;
     height: 100%;
     border: none;

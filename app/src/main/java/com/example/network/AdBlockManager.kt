@@ -124,6 +124,9 @@ object AdBlockManager {
         "chaturbate.com",
         "stripchat.com",
         "livejasmin.com",
+        "belygylykijife.com",
+        "proudfisherman.com",
+        "glaringgoalie.com",
         "xads.js",
         "popunder"
     )
@@ -142,15 +145,29 @@ object AdBlockManager {
         "sedoparking"
     )
 
+    private val MEDIA_EXTENSIONS = listOf(
+        ".mp4", ".m3u8", ".ts", ".m4s", ".mpd", ".webm",
+        ".vtt", ".srt", ".woff", ".woff2", ".ttf", ".css"
+    )
+
     private val ALLOWED_PLAYER_HOST_TOKENS = listOf(
         "pobreflixtv",
         "anichan.to",
         "byse",
+        "bysesuk",
         "mxdrop",
         "mixdrop",
         "streamtape",
         "playmogo",
         "dood",
+        "d000d",
+        "d0000d",
+        "ds2play",
+        "dsvplay",
+        "do0od",
+        "dooood",
+        "myvidplay",
+        "vide0",
         "filemoon",
         "vidhide",
         "streamwish",
@@ -305,22 +322,51 @@ object AdBlockManager {
 
     private fun isWhitelistedDomain(domainOrUrl: String): Boolean {
         val host = if (domainOrUrl.contains("://")) extractHost(domainOrUrl) else domainOrUrl.lowercase()
+        if (host.isBlank()) return false
         return host.contains("pobreflixtv") ||
             host.contains("anichan.to") ||
             host.contains("anilist.co") ||
             host.contains("tmdb.org") ||
             host.contains("byse") ||
+            host.contains("bysesuk") ||
             host.contains("mxdrop") ||
             host.contains("mixdrop") ||
+            host.contains("mxcontent") ||
+            host.contains("mxdcontent") ||
             host.contains("streamtape") ||
             host.contains("playmogo") ||
+            host.contains("doodcdn") ||
+            host.contains("imgds.net") ||
+            host.contains("dood") ||
+            host.contains("d000d") ||
+            host.contains("d0000d") ||
+            host.contains("ds2play") ||
+            host.contains("dsvplay") ||
+            host.contains("do0od") ||
+            host.contains("dooood") ||
+            host.contains("myvidplay") ||
+            host.contains("vide0") ||
             host.contains("filemoon") ||
             host.contains("vidhide") ||
             host.contains("streamwish") ||
+            host.contains("challenges.cloudflare.com") ||
+            host.contains("cloudflareinsights.com") ||
+            host.contains("recaptcha.net") ||
             host.contains("googleapis.com") ||
             host.contains("gstatic.com") ||
             host.contains("cdnjs.cloudflare.com") ||
-            host.contains("code.jquery.com")
+            host.contains("code.jquery.com") ||
+            host.contains("jsdelivr.net") ||
+            host.contains("unpkg.com")
+    }
+
+    private fun hostMatchesRule(host: String, rule: String): Boolean {
+        if (host.isBlank() || rule.isBlank()) return false
+        return if (rule.contains(".")) {
+            host == rule || host.endsWith(".$rule")
+        } else {
+            host.contains(rule)
+        }
     }
 
     fun isBlockedUrl(url: String): Boolean {
@@ -330,15 +376,20 @@ object AdBlockManager {
             return false
         }
 
-        // Mesmo em domínios de vídeo confiáveis, bloqueia scripts específicos de anúncio embutidos (ex: /xads.js)
-        if (HEURISTIC_AD_PATHS.any { lower.contains(it) }) {
+        val host = extractHost(lower)
+        val pathOnly = lower.substringBefore("?").substringBefore("#")
+        val isMediaOrStyle = MEDIA_EXTENSIONS.any { pathOnly.endsWith(it) }
+
+        // Bloqueia scripts específicos de anúncio embutidos (ex: /xads.js), sem afetar mídia direta (.mp4/.m3u8/.ts/.css)
+        if (!isMediaOrStyle && HEURISTIC_AD_PATHS.any { lower.contains(it) }) {
             return true
         }
 
-        if (isWhitelistedDomain(lower)) return false
+        if (isWhitelistedDomain(host)) return false
+        if (isMediaOrStyle && host.isBlank()) return false
 
         val rules = activeRulesSet
-        return rules.any { rule -> lower.contains(rule) }
+        return rules.any { rule -> hostMatchesRule(host, rule) }
     }
 
     /**

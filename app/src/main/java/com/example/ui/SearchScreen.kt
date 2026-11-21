@@ -1,22 +1,24 @@
 package com.example.ui
 
-import android.view.KeyEvent
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.focusable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -31,23 +33,26 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.model.AppState
 import com.example.model.Movie
+import com.example.ui.theme.*
 import kotlinx.coroutines.delay
 
 @Composable
 fun SearchScreen(
     state: AppState.HomeLoaded,
     onMovieClick: (Movie) -> Unit,
-    onSearch: (String, String) -> Unit, // query, source ("Filmes" or "Animes")
+    onSearch: (String) -> Unit,
+    onRemoveRecentSearch: (String) -> Unit = {},
     onClose: () -> Unit
 ) {
     var query by remember { mutableStateOf(state.searchQuery) }
-    var searchSource by remember { mutableStateOf(if (state.currentTab == "Animes") "Animes" else "Filmes") }
     var filterType by remember { mutableStateOf("Todos") } // "Todos", "Filmes", "Séries"
     val keyboardController = LocalSoftwareKeyboardController.current
     val focusRequester = remember { FocusRequester() }
@@ -56,11 +61,11 @@ fun SearchScreen(
         onClose()
     }
 
-    // Auto-search debounce after typing 2 or more characters
-    LaunchedEffect(query, searchSource) {
-        if (query.trim().length >= 2 && query.trim() != state.searchQuery) {
-            delay(500)
-            onSearch(query.trim(), searchSource)
+    LaunchedEffect(query) {
+        val trimmed = query.trim()
+        if (trimmed.length >= 2 && trimmed != state.searchQuery) {
+            delay(450)
+            onSearch(trimmed)
         }
     }
 
@@ -70,20 +75,24 @@ fun SearchScreen(
         } catch (_: Exception) {}
     }
 
+    val historyByUrl = remember(state.watchHistory) { state.watchHistory.associateBy { it.id } }
     val results = state.searchResults
-    val filteredResults = when (filterType) {
-        "Filmes" -> results.filter { !it.isSeries }
-        "Séries" -> results.filter { it.isSeries }
-        else -> results
+    val filteredResults = remember(results, filterType) {
+        when (filterType) {
+            "Filmes" -> results.filter { !it.isSeries }
+            "Séries" -> results.filter { it.isSeries }
+            else -> results
+        }
     }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF0F0F12))
+            .background(ObsidianBg)
             .statusBarsPadding()
+            .navigationBarsPadding()
     ) {
-        // Search Header Bar
+        // Header Search Bar
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -93,26 +102,26 @@ fun SearchScreen(
             IconButton(
                 onClick = onClose,
                 modifier = Modifier
-                    .size(44.dp)
-                    .background(Color(0xFF1E2028), CircleShape)
+                    .size(48.dp)
+                    .background(ObsidianCard, CircleShape)
+                    .testTag("search_back_button")
             ) {
                 Icon(
-                    imageVector = Icons.Default.ArrowBack,
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                     contentDescription = "Voltar",
-                    tint = Color.White
+                    tint = TextPrimary
                 )
             }
 
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = Modifier.width(10.dp))
 
-            // Search Text Field
             OutlinedTextField(
                 value = query,
                 onValueChange = { query = it },
                 placeholder = {
                     Text(
-                        if (searchSource == "Animes") "Buscar animes no AniChan (ex: Naruto)..." else "Buscar filmes e séries no Pobreflix...",
-                        color = Color.Gray,
+                        "Buscar filmes ou séries...",
+                        color = TextSecondary,
                         fontSize = 13.sp
                     )
                 },
@@ -121,259 +130,287 @@ fun SearchScreen(
                 keyboardActions = KeyboardActions(
                     onSearch = {
                         keyboardController?.hide()
-                        if (query.isNotBlank()) onSearch(query.trim(), searchSource)
+                        if (query.isNotBlank()) onSearch(query.trim())
                     }
                 ),
                 leadingIcon = {
                     Icon(
                         imageVector = Icons.Default.Search,
                         contentDescription = null,
-                        tint = if (state.isLoadingSearch) {
-                            if (searchSource == "Animes") Color(0xFF6C5CE7) else Color(0xFFE50914)
-                        } else Color.LightGray
+                        tint = if (state.isLoadingSearch) CrimsonPrimary else TextSecondary
                     )
                 },
                 trailingIcon = {
                     if (query.isNotEmpty()) {
-                        IconButton(onClick = {
-                            query = ""
-                            onSearch("", searchSource)
-                        }) {
+                        IconButton(
+                            onClick = {
+                                query = ""
+                                onSearch("")
+                            },
+                            modifier = Modifier.size(48.dp)
+                        ) {
                             Icon(
                                 imageVector = Icons.Default.Clear,
-                                contentDescription = "Limpar",
-                                tint = Color.LightGray
+                                contentDescription = "Limpar busca",
+                                tint = TextSecondary
                             )
                         }
                     }
                 },
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedTextColor = Color.White,
-                    unfocusedTextColor = Color.White,
-                    focusedContainerColor = Color(0xFF1E2028),
-                    unfocusedContainerColor = Color(0xFF1E2028),
-                    cursorColor = if (searchSource == "Animes") Color(0xFF6C5CE7) else Color(0xFFE50914),
-                    focusedBorderColor = if (searchSource == "Animes") Color(0xFF6C5CE7) else Color(0xFFE50914),
-                    unfocusedBorderColor = Color(0xFF2A2D38)
+                    focusedTextColor = TextPrimary,
+                    unfocusedTextColor = TextPrimary,
+                    focusedContainerColor = ObsidianCard,
+                    unfocusedContainerColor = ObsidianCard,
+                    cursorColor = CrimsonPrimary,
+                    focusedBorderColor = CrimsonPrimary,
+                    unfocusedBorderColor = ObsidianStroke
                 ),
                 shape = RoundedCornerShape(24.dp),
                 modifier = Modifier
                     .weight(1f)
                     .focusRequester(focusRequester)
+                    .testTag("search_input")
                     .onKeyEvent { event ->
                         if (event.type == KeyEventType.KeyUp && (event.key == Key.Enter || event.key == Key.NumPadEnter)) {
                             keyboardController?.hide()
-                            if (query.isNotBlank()) onSearch(query.trim(), searchSource)
+                            if (query.isNotBlank()) onSearch(query.trim())
                             true
-                        } else {
-                            false
-                        }
+                        } else false
                     }
             )
 
             Spacer(modifier = Modifier.width(8.dp))
 
-            // Search Submit Button
             Button(
                 onClick = {
                     keyboardController?.hide()
-                    if (query.isNotBlank()) onSearch(query.trim(), searchSource)
+                    if (query.isNotBlank()) onSearch(query.trim())
                 },
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = if (searchSource == "Animes") Color(0xFF6C5CE7) else Color(0xFFE50914)
-                ),
+                colors = ButtonDefaults.buttonColors(containerColor = CrimsonPrimary),
                 shape = RoundedCornerShape(20.dp),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp)
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+                modifier = Modifier
+                    .heightIn(min = 48.dp)
+                    .testTag("search_submit_button")
             ) {
                 Text("Buscar", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
             }
         }
 
-        // Search Source & Filter Pills
+        // Type Filter Chips
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 6.dp),
+                .padding(horizontal = 16.dp, vertical = 4.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Source: Pobreflix
-            Surface(
-                color = if (searchSource == "Filmes") Color(0xFFE50914) else Color(0xFF1E2028),
-                shape = RoundedCornerShape(16.dp),
-                modifier = Modifier
-                    .clickable {
-                        searchSource = "Filmes"
-                        if (query.isNotBlank()) onSearch(query.trim(), "Filmes")
-                    }
-                    .focusable()
-            ) {
-                Text(
-                    text = "🎬 Pobreflix",
-                    color = Color.White,
-                    fontSize = 12.sp,
-                    fontWeight = if (searchSource == "Filmes") FontWeight.Bold else FontWeight.Medium,
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-                )
-            }
-
-            // Source: AniChan
-            Surface(
-                color = if (searchSource == "Animes") Color(0xFF6C5CE7) else Color(0xFF1E2028),
-                shape = RoundedCornerShape(16.dp),
-                modifier = Modifier
-                    .clickable {
-                        searchSource = "Animes"
-                        if (query.isNotBlank()) onSearch(query.trim(), "Animes")
-                    }
-                    .focusable()
-            ) {
-                Text(
-                    text = "⚡ AniChan (Animes)",
-                    color = Color.White,
-                    fontSize = 12.sp,
-                    fontWeight = if (searchSource == "Animes") FontWeight.Bold else FontWeight.Medium,
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-                )
-            }
-
-            if (searchSource == "Filmes") {
-                Spacer(modifier = Modifier.width(4.dp))
-                listOf("Todos", "Filmes", "Séries").forEach { type ->
-                    val isSelected = filterType == type
-                    Surface(
-                        color = if (isSelected) Color(0xFF333644) else Color(0xFF161820),
-                        shape = RoundedCornerShape(14.dp),
-                        modifier = Modifier
-                            .clickable { filterType = type }
-                            .focusable()
-                    ) {
+            listOf("Todos", "Filmes", "Séries").forEach { type ->
+                val isSelected = filterType == type
+                FilterChip(
+                    selected = isSelected,
+                    onClick = { filterType = type },
+                    label = {
                         Text(
                             text = type,
-                            color = if (isSelected) Color.White else Color.LightGray,
-                            fontSize = 11.sp,
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                            fontSize = 12.sp
                         )
+                    },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = CrimsonPrimary,
+                        selectedLabelColor = Color.White,
+                        containerColor = ObsidianCard,
+                        labelColor = TextSecondary
+                    ),
+                    border = FilterChipDefaults.filterChipBorder(
+                        enabled = true,
+                        selected = isSelected,
+                        borderColor = ObsidianStroke
+                    ),
+                    modifier = Modifier.heightIn(min = 48.dp)
+                )
+            }
+        }
+
+        // Recent Searches
+        if (state.recentSearches.isNotEmpty() && query.isBlank()) {
+            Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
+                Text(
+                    text = "Buscas Recentes",
+                    color = TextSecondary,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    state.recentSearches.forEach { recent ->
+                        Surface(
+                            color = ObsidianCard,
+                            shape = RoundedCornerShape(16.dp),
+                            border = BorderStroke(1.dp, ObsidianStroke),
+                            modifier = Modifier.heightIn(min = 48.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .clickable {
+                                        query = recent
+                                        onSearch(recent)
+                                    }
+                                    .padding(start = 12.dp, end = 6.dp, top = 6.dp, bottom = 6.dp)
+                            ) {
+                                Icon(Icons.Default.History, contentDescription = null, tint = AmberGold, modifier = Modifier.size(15.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(recent, color = TextPrimary, fontSize = 12.sp)
+                                IconButton(
+                                    onClick = { onRemoveRecentSearch(recent) },
+                                    modifier = Modifier.size(32.dp)
+                                ) {
+                                    Icon(Icons.Default.Close, contentDescription = "Remover busca", tint = TextSecondary, modifier = Modifier.size(14.dp))
+                                }
+                            }
+                        }
                     }
                 }
             }
         }
 
-        HorizontalDivider(color = Color(0xFF1E2028), thickness = 1.dp)
+        HorizontalDivider(color = ObsidianStroke, thickness = 1.dp)
 
-        // Results Content
+        // Results
         Box(modifier = Modifier.fillMaxSize()) {
-            if (state.isLoadingSearch) {
-                Column(
-                    modifier = Modifier.align(Alignment.Center),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    CircularProgressIndicator(
-                        color = if (searchSource == "Animes") Color(0xFF6C5CE7) else Color(0xFFE50914)
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        if (searchSource == "Animes") "Buscando animes no AniChan..." else "Pesquisando catálogo Pobreflix...",
-                        color = Color.LightGray,
-                        fontSize = 14.sp
-                    )
-                }
-            } else if (state.searchQuery.isNotBlank() && filteredResults.isEmpty()) {
-                Column(
-                    modifier = Modifier
-                        .align(Alignment.Center)
-                        .padding(32.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Search,
-                        contentDescription = null,
-                        tint = Color.Gray,
-                        modifier = Modifier.size(56.dp)
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        text = "Nenhum resultado encontrado para \"${state.searchQuery}\"",
-                        color = Color.White,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 16.sp
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = if (searchSource == "Animes") "Tente buscar pelo nome em inglês ou japonês (ex: Naruto, Jujutsu Kaisen, Solo Leveling)." else "Dica: Tente pesquisar apenas uma palavra (ex: Batman, Vingadores, Velozes).",
-                        color = Color.Gray,
-                        fontSize = 13.sp
-                    )
-                    Spacer(modifier = Modifier.height(14.dp))
-                    Button(
-                        onClick = {
-                            val newSource = if (searchSource == "Animes") "Filmes" else "Animes"
-                            searchSource = newSource
-                            if (query.isNotBlank()) onSearch(query.trim(), newSource)
-                        },
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (searchSource == "Animes") Color(0xFFE50914) else Color(0xFF6C5CE7)
-                        ),
-                        shape = RoundedCornerShape(18.dp)
+            when {
+                state.isLoadingSearch -> {
+                    Column(
+                        modifier = Modifier.align(Alignment.Center),
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Text(
-                            text = if (searchSource == "Animes") "🎬 Buscar no Pobreflix (Filmes/Séries)" else "⚡ Buscar no AniChan (Animes)",
-                            color = Color.White,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 13.sp
-                        )
+                        CircularProgressIndicator(color = CrimsonPrimary)
+                        Spacer(modifier = Modifier.height(14.dp))
+                        Text("Pesquisando filmes e séries...", color = TextSecondary, fontSize = 14.sp)
                     }
                 }
-            } else if (filteredResults.isNotEmpty()) {
-                Column(modifier = Modifier.fillMaxSize()) {
-                    Text(
-                        text = "${filteredResults.size} títulos encontrados em ${if (searchSource == "Animes") "AniChan" else "Pobreflix"}",
-                        color = Color.Gray,
-                        fontSize = 13.sp,
-                        modifier = Modifier.padding(start = 20.dp, top = 12.dp, bottom = 8.dp)
-                    )
-                    LazyVerticalGrid(
-                        columns = GridCells.Adaptive(minSize = 130.dp),
-                        contentPadding = PaddingValues(16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                        modifier = Modifier.fillMaxSize()
+
+                state.searchQuery.isNotBlank() && filteredResults.isEmpty() -> {
+                    Column(
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .padding(28.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        items(filteredResults) { movie ->
-                            MoviePosterCard(
-                                movie = movie,
-                                onClick = { onMovieClick(movie) }
-                            )
+                        Icon(
+                            imageVector = Icons.Default.Search,
+                            contentDescription = null,
+                            tint = TextMuted,
+                            modifier = Modifier.size(56.dp)
+                        )
+                        Spacer(modifier = Modifier.height(14.dp))
+                        Text(
+                            text = "Nenhum resultado para \"${state.searchQuery}\"",
+                            color = TextPrimary,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 16.sp,
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "Dica: tente uma palavra simples, sem acentos ou só o nome principal.",
+                            color = TextSecondary,
+                            fontSize = 13.sp,
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Button(
+                            onClick = { onSearch(state.searchQuery) },
+                            colors = ButtonDefaults.buttonColors(containerColor = CrimsonPrimary),
+                            shape = RoundedCornerShape(14.dp),
+                            modifier = Modifier.heightIn(min = 48.dp)
+                        ) {
+                            Text("Tentar Novamente", fontWeight = FontWeight.Bold)
                         }
                     }
                 }
-            } else {
-                Column(
-                    modifier = Modifier
-                        .align(Alignment.Center)
-                        .padding(32.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Search,
-                        contentDescription = null,
-                        tint = Color(0xFF333642),
-                        modifier = Modifier.size(64.dp)
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        if (searchSource == "Animes") "Digite o nome de um anime para pesquisar" else "Digite um filme ou série para pesquisar",
-                        color = Color.LightGray,
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Medium
-                    )
-                    Text(
-                        if (searchSource == "Animes") "Ex: One Piece, Jujutsu Kaisen, Demon Slayer, Naruto" else "Ex: Batman, Resident Evil, Homem-Aranha, Lanternas",
-                        color = Color.DarkGray,
-                        fontSize = 12.sp,
-                        modifier = Modifier.padding(top = 4.dp)
-                    )
+
+                filteredResults.isNotEmpty() -> {
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        Text(
+                            text = "${filteredResults.size} títulos encontrados",
+                            color = TextSecondary,
+                            fontSize = 12.sp,
+                            modifier = Modifier.padding(start = 16.dp, top = 10.dp, bottom = 4.dp)
+                        )
+                        LazyVerticalGrid(
+                            columns = GridCells.Adaptive(minSize = 120.dp),
+                            contentPadding = PaddingValues(16.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                            modifier = Modifier.fillMaxSize()
+                        ) {
+                            items(filteredResults) { movie ->
+                                val hist = historyByUrl[movie.url]
+                                MoviePosterCard(
+                                    movie = movie,
+                                    isFavorite = hist?.favorite == true,
+                                    isWatched = hist != null && (hist.completed || hist.watchedEpisodes.isNotEmpty()),
+                                    onClick = { onMovieClick(movie) }
+                                )
+                            }
+                        }
+                    }
+                }
+
+                else -> {
+                    Column(
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .padding(28.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Search,
+                            contentDescription = null,
+                            tint = ObsidianStroke,
+                            modifier = Modifier.size(64.dp)
+                        )
+                        Spacer(modifier = Modifier.height(14.dp))
+                        Text(
+                            text = "Pesquise filmes e séries completos",
+                            color = TextPrimary,
+                            style = MaterialTheme.typography.titleLarge,
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = "Sugestões rápidas:",
+                            color = TextSecondary,
+                            fontSize = 12.sp
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Row(
+                            modifier = Modifier.horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            listOf("Batman", "Vingadores", "Breaking Bad", "Stranger Things", "Homem-Aranha").forEach { suggestion ->
+                                AssistChip(
+                                    onClick = {
+                                        query = suggestion
+                                        onSearch(suggestion)
+                                    },
+                                    label = { Text(suggestion, color = TextPrimary, fontSize = 12.sp) },
+                                    colors = AssistChipDefaults.assistChipColors(containerColor = ObsidianCard),
+                                    border = BorderStroke(1.dp, ObsidianStroke),
+                                    modifier = Modifier.heightIn(min = 48.dp)
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }

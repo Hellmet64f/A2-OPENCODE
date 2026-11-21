@@ -39,19 +39,18 @@ jobs:
             gradle assembleDebug --stacktrace
           fi
 
-      - name: Prepare Release Artifacts (APK & PC Package)
+      - name: Generate Single Self-Contained PC .bat & Prepare Release Artifacts
         run: |
+          python3 scripts/build_pc_bat.py
           mkdir -p release-output
           cp app/build/outputs/apk/debug/*.apk release-output/A2-Miguel-TV.apk || cp $(find app/build/outputs/apk/ -name "*.apk" | head -n 1) release-output/A2-Miguel-TV.apk
 
-          # Package Windows PC Standalone Package (Instalação em Downloads\A2-Miguel-PC)
+          # O pacote ZIP de PC deve conter APENAS o arquivo único A2-Miguel-PC.bat
+          rm -rf pc-package
           mkdir -p pc-package
-          cp Instalar-e-Rodar-no-PC.bat pc-package/
-          cp Abrir-no-PC.bat pc-package/
-          cp Instalar-Atalho-PC.bat pc-package/
-          cp README.md pc-package/
-          cp -r app-pc pc-package/
-          cd pc-package && zip -r ../release-output/A2-Miguel-PC-Windows.zip * && cd ..
+          cp A2-Miguel-PC.bat pc-package/
+          cd pc-package && zip -j ../release-output/A2-Miguel-PC-Windows.zip A2-Miguel-PC.bat && cd ..
+          unzip -l release-output/A2-Miguel-PC-Windows.zip
 
       - name: Upload Release Artifacts
         uses: actions/upload-artifact@v4
@@ -64,26 +63,22 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_type == 'tag' && github.ref_name || 'v1.0.0' }}
-          name: "A2 Miguel - Versão Oficial TV & PC (${{ github.ref_type == 'tag' && github.ref_name || 'v1.0.0' }})"
+          name: "A2 Miguel - Filmes e Séries Celular, TV & PC (${{ github.ref_type == 'tag' && github.ref_name || 'v1.0.0' }})"
           body: |
-            ### 🎬 A2 Miguel - Aplicativo Oficial de Filmes, Séries e Animes
+            ### 🎬 A2 Miguel — Filmes e Séries (Celular, TV & Windows PC)
 
             **Arquivos disponíveis para download nesta Release:**
-            1. 📱 **`A2-Miguel-TV.apk`**: Instalador completo para Smart TV, TV Box Android (Aquário, Mi Box, Fire TV) e celulares.
-            2. 💻 **`A2-Miguel-PC-Windows.zip`**: Pacote de inicialização em janela nativa dedicada para Computador (Windows), incluindo atalho com 1 clique para a Área de Trabalho.
+            1. 📱 **`A2-Miguel-TV.apk`**: Aplicativo completo focado em **Celular Android**, **Tablets** e **Smart TVs / TV Box** com busca ao vivo, catálogo completo, AdBlock 70+ auto-atualizável, histórico de episódios ("Já Visto"), troca de temporada e sincronização em nuvem + backup JSON gratuito.
+            2. 💻 **`A2-Miguel-PC-Windows.zip`**: Contém **apenas 1 arquivo (`A2-Miguel-PC.bat`)**! Basta extrair e dar dois cliques que ele instala tudo automaticamente na pasta `Downloads\A2-Miguel-PC`, cria o atalho na Área de Trabalho, sobe o servidor local com AdBlock 70+ e abre a janela dedicada no PC.
 
             ---
 
-            ### 🚀 Novos Recursos Inclusos:
-            - 📥 **Janela Dedicada de Download & Edição (PC e TV)**:
-              - Escolha a pasta de salvamento (`Downloads`, `Filmes`, `Séries`).
-              - Selecione a qualidade do vídeo (`1080p Full HD`, `720p HD`, `480p Rápido` ou `Original`).
-              - Edite o nome do arquivo antes de baixar.
-              - Atalho rápido no teclado: pressione a tecla **`D`** no PC para abrir a janela!
-            - 🔍 **Controle de Zoom da Tela & Enquadramento**: Modos Normal (100%), Ajustar (115%), Cinema (130%) e Tela Cheia (150%) para eliminar barras pretas.
-            - 🎯 **Calibração de Foco Automático**: Mira com controle remoto para salvar a posição do Play em todos os vídeos.
-            - 🎮 **Atalhos no Controle**: Volume `+`/`-` troca episódios; setas avançam/retrocedem 10s.
-            - 🛡️ **Autoplay Dublado & Sem Anúncios**.
+            ### 🚀 Destaques da Atualização:
+            - 🛡️ **Motor AdBlock 70+ Auto-Atualizável**: Proteção contra popups, redirecionamentos, rastreadores e anúncios de apostas no Celular e no PC.
+            - 🔍 **Busca Rápida em Tempo Real + Histórico Recente**: Encontre qualquer filme ou série instantaneamente com filtros `Todos / Filmes / Séries`.
+            - 📺 **Séries Completas no Player**: Troque de temporada, volte/avance episódios (`Ep Anterior` / `Próx Ep`), reinicie do início (`↺ Reiniciar`) e acompanhe o selo **✓ Já Visto**.
+            - 💾 **Dados Salvos Gratuitamente**: Nuvem Google no Android + Backup JSON portátil compatível entre Celular e PC.
+            - 📥 **Download & Edição (`Tecla D`) + Zoom (`Tecla Z`)**: Renomeie arquivos, escolha pasta e ajuste o enquadramento.
           files: release-output/*
           draft: false
           prerelease: false

@@ -319,8 +319,8 @@ fun DownloadAndEditDialog(
 
                             2 -> PcCompanionTabContent(
                                 onCopyPcUrl = {
-                                    clipboardManager.setText(AnnotatedString("https://ais-pre-6r5myv5rfy2ejl7ibgbd7v-719019642347.us-west2.run.app"))
-                                    Toast.makeText(context, "Link do app copiado para abrir no PC!", Toast.LENGTH_SHORT).show()
+                                    clipboardManager.setText(AnnotatedString("https://www.pobreflixtv.delivery/"))
+                                    Toast.makeText(context, "Link do catálogo copiado!", Toast.LENGTH_SHORT).show()
                                 }
                             )
                         }
@@ -668,10 +668,10 @@ private fun PcCompanionTabContent(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text("💡 Como usar no PC:", color = Color(0xFFFFD54F), fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                    Text("1. Na pasta do projeto baixada, dê dois cliques em 'Abrir-no-PC.bat'.", color = Color.LightGray, fontSize = 11.sp)
-                    Text("2. O programa abrirá em uma janela nativa limpa, sem barra de navegação, exatamente como um .exe.", color = Color.LightGray, fontSize = 11.sp)
-                    Text("3. Para converter para um .exe real com ícone, use utilitários como 'Bat To Exe Converter'.", color = Color.LightGray, fontSize = 11.sp)
+                    Text("💡 Como usar no PC (Windows):", color = Color(0xFFFFD54F), fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    Text("1. Baixe o pacote do PC (A2-Miguel-PC-Windows.zip) e extraia o arquivo único 'A2-Miguel-PC.bat'.", color = Color.LightGray, fontSize = 11.sp)
+                    Text("2. Dê dois cliques em 'A2-Miguel-PC.bat': ele instala tudo em Downloads\\A2-Miguel-PC e abre a janela dedicada.", color = Color.LightGray, fontSize = 11.sp)
+                    Text("3. Você pode exportar seu histórico em JSON no celular e importar direto no PC para continuar de onde parou!", color = Color.LightGray, fontSize = 11.sp)
                 }
             }
 
@@ -683,7 +683,7 @@ private fun PcCompanionTabContent(
             ) {
                 Icon(imageVector = Icons.Default.OpenInBrowser, contentDescription = null, modifier = Modifier.size(16.dp))
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Copiar Link de Acesso Web para o PC", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text("Copiar Link do Catálogo Pobreflix", fontWeight = FontWeight.Bold, fontSize = 12.sp)
             }
         }
     }

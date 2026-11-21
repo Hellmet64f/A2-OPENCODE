@@ -1,3 +1,8 @@
 <resources>
     <string name="app_name">A2 Miguel</string>
+    <string name="app_tagline">Filmes e Séries sem Anúncios</string>
+    <string name="sign_in_google">Entrar com Google</string>
+    <string name="search_placeholder">Buscar filmes ou séries...</string>
+    <string name="continue_watching">Continuar Assistindo</string>
+    <string name="adblock_active">AdBlock 70+ Ativo</string>
 </resources>

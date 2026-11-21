@@ -17,7 +17,7 @@ object VideoDownloadManager {
     enum class TargetFolder(val displayName: String, val systemDirectory: String, val subPath: String) {
         DOWNLOADS("📂 Downloads", Environment.DIRECTORY_DOWNLOADS, ""),
         MOVIES("🎬 Filmes", Environment.DIRECTORY_DOWNLOADS, "Filmes"),
-        SERIES("📺 Séries & Animes", Environment.DIRECTORY_DOWNLOADS, "Series"),
+        SERIES("📺 Séries", Environment.DIRECTORY_DOWNLOADS, "Series"),
         CUSTOM("📁 A2 Miguel Videos", Environment.DIRECTORY_DOWNLOADS, "A2_Miguel")
     }
 

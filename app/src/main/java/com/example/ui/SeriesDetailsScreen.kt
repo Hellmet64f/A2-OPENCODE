@@ -1,15 +1,12 @@
 package com.example.ui
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -20,43 +17,47 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.model.AppState
 import com.example.model.Episode
+import com.example.model.WatchHistoryItem
+import com.example.ui.theme.*
 import kotlinx.coroutines.launch
 
 @Composable
 fun SeriesDetailsScreen(
     state: AppState.SeriesDetails,
+    historyItem: WatchHistoryItem?,
     onEpisodeClick: (Episode) -> Unit,
+    onRestartSeries: () -> Unit,
+    onContinueSeries: () -> Unit,
+    onToggleFavorite: () -> Unit,
     onSeasonSelect: (Int) -> Unit,
+    onAudioSelect: (String) -> Unit,
     onBack: () -> Unit
 ) {
     BackHandler { onBack() }
-
-    val isAnime = state.series.isAnime
-    val accentColor = if (isAnime) Color(0xFF6C5CE7) else Color(0xFFE50914)
 
     val seasons = if (state.availableSeasons.isNotEmpty()) {
         state.availableSeasons.sorted()
@@ -66,37 +67,37 @@ fun SeriesDetailsScreen(
     }
 
     val currentSeason = state.selectedSeason
-    var selectedAudio by remember { mutableStateOf(state.selectedAudio) }
-    var isGridView by remember { mutableStateOf(isAnime) }
+    var isGridView by remember { mutableStateOf(false) }
     val seasonEpisodes = state.episodes.filter { it.season == currentSeason }
     val episodesListState = rememberLazyListState()
     val scope = rememberCoroutineScope()
 
+    val isFavorite = historyItem?.favorite == true
+    val watchedKeys = historyItem?.watchedEpisodes.orEmpty().toSet()
+
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF0F0F12))
+            .background(ObsidianBg)
     ) {
-        // Hero Background Artwork
         AsyncImage(
             model = state.series.coverUrl,
             contentDescription = null,
             contentScale = ContentScale.Crop,
             modifier = Modifier
                 .fillMaxSize()
-                .alpha(0.25f)
+                .alpha(0.22f)
         )
 
-        // Gradient overlay
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(
                     Brush.verticalGradient(
                         colors = listOf(
-                            Color(0xFF0F0F12).copy(alpha = 0.5f),
-                            Color(0xFF0F0F12).copy(alpha = 0.95f),
-                            Color(0xFF0F0F12)
+                            ObsidianBg.copy(alpha = 0.5f),
+                            ObsidianBg.copy(alpha = 0.94f),
+                            ObsidianBg
                         )
                     )
                 )
@@ -106,9 +107,10 @@ fun SeriesDetailsScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .statusBarsPadding()
-                .padding(horizontal = 24.dp, vertical = 16.dp)
+                .navigationBarsPadding()
+                .padding(horizontal = 18.dp, vertical = 12.dp)
         ) {
-            // Header: Back button + Title & Badges
+            // Header
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth()
@@ -116,189 +118,236 @@ fun SeriesDetailsScreen(
                 IconButton(
                     onClick = onBack,
                     modifier = Modifier
-                        .size(44.dp)
-                        .background(Color(0xFF1E2028), CircleShape)
+                        .size(48.dp)
+                        .background(ObsidianCard, CircleShape)
+                        .testTag("details_back_button")
                 ) {
                     Icon(
-                        imageVector = Icons.Default.ArrowBack,
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = "Voltar",
-                        tint = Color.White
+                        tint = TextPrimary
                     )
                 }
 
-                Spacer(modifier = Modifier.width(16.dp))
+                Spacer(modifier = Modifier.width(12.dp))
 
                 Column(modifier = Modifier.weight(1f)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
                         Surface(
-                            color = accentColor,
-                            shape = RoundedCornerShape(4.dp)
+                            color = CrimsonPrimary,
+                            shape = RoundedCornerShape(6.dp)
                         ) {
                             Text(
-                                text = if (isAnime) "ANIME COMPLETO • ANICHAN" else "SÉRIE COMPLETA",
+                                text = "SÉRIE COMPLETA",
                                 color = Color.White,
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Black,
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
                             )
                         }
-                        if (isAnime) {
-                            Spacer(modifier = Modifier.width(6.dp))
+                        if (watchedKeys.isNotEmpty()) {
                             Surface(
-                                color = Color(0xFF22242B),
-                                shape = RoundedCornerShape(4.dp)
+                                color = EmeraldAdBlock.copy(alpha = 0.18f),
+                                shape = RoundedCornerShape(6.dp),
+                                border = BorderStroke(1.dp, EmeraldAdBlock.copy(alpha = 0.5f))
                             ) {
                                 Text(
-                                    text = "SUB & DUB",
-                                    color = Color(0xFFA29BFE),
+                                    text = "${watchedKeys.size} episódios vistos",
+                                    color = EmeraldAdBlock,
                                     fontSize = 10.sp,
                                     fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                                    modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
                                 )
                             }
                         }
                     }
-                    Spacer(modifier = Modifier.height(2.dp))
+                    Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = state.series.title,
-                        color = Color.White,
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = TextPrimary,
+                        maxLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
                 }
 
-                // Quick Play First Episode Button
-                if (seasonEpisodes.isNotEmpty()) {
+                IconButton(
+                    onClick = onToggleFavorite,
+                    modifier = Modifier
+                        .size(48.dp)
+                        .background(ObsidianCard, CircleShape)
+                        .testTag("details_favorite_button")
+                ) {
+                    Icon(
+                        imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                        contentDescription = if (isFavorite) "Remover favorito" else "Favoritar série",
+                        tint = if (isFavorite) AmberGold else TextPrimary
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Primary Playback CTAs: Continuar + Reiniciar Série
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                if (historyItem != null) {
+                    Button(
+                        onClick = onContinueSeries,
+                        colors = ButtonDefaults.buttonColors(containerColor = CrimsonPrimary),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier
+                            .weight(1.3f)
+                            .heightIn(min = 48.dp)
+                            .testTag("details_continue_button")
+                    ) {
+                        Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "Continuar T${historyItem.season} E${historyItem.episodeNumber}",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp
+                        )
+                    }
+                    OutlinedButton(
+                        onClick = onRestartSeries,
+                        shape = RoundedCornerShape(12.dp),
+                        border = BorderStroke(1.dp, AmberGold.copy(alpha = 0.6f)),
+                        modifier = Modifier
+                            .weight(1f)
+                            .heightIn(min = 48.dp)
+                            .testTag("details_restart_button")
+                    ) {
+                        Icon(Icons.Default.Replay, contentDescription = null, tint = AmberGold, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Reiniciar (T1 E1)", color = TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    }
+                } else if (seasonEpisodes.isNotEmpty()) {
                     Button(
                         onClick = { onEpisodeClick(seasonEpisodes.first()) },
-                        colors = ButtonDefaults.buttonColors(containerColor = accentColor),
+                        colors = ButtonDefaults.buttonColors(containerColor = CrimsonPrimary),
                         shape = RoundedCornerShape(12.dp),
-                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 48.dp)
+                            .testTag("details_watch_first_button")
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.PlayArrow,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp),
-                            tint = Color.White
+                        Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "Assistir Temporada $currentSeason • Ep ${seasonEpisodes.first().number}",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp
                         )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Assistir", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
-            // Audio & View Mode Selectors
+            // Audio Toggle (Dublado vs Legendado) + View Mode Toggle
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                // Audio Toggle (Dublado vs Legendado)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     listOf("Dublado", "Legendado").forEach { audioOption ->
-                        val isSelected = selectedAudio == audioOption
+                        val isSelected = state.selectedAudio == audioOption
                         Surface(
-                            color = if (isSelected) accentColor else Color(0xFF1E2028),
+                            onClick = { onAudioSelect(audioOption) },
+                            color = if (isSelected) CrimsonPrimary else ObsidianCard,
                             shape = RoundedCornerShape(10.dp),
-                            border = if (isSelected) BorderStroke(1.5.dp, Color.White.copy(alpha = 0.5f)) else null,
-                            modifier = Modifier
-                                .clickable { selectedAudio = audioOption }
-                                .focusable()
+                            border = BorderStroke(1.dp, if (isSelected) Color.White.copy(alpha = 0.5f) else ObsidianStroke),
+                            modifier = Modifier.heightIn(min = 48.dp)
                         ) {
-                            Text(
-                                text = if (audioOption == "Dublado") "🎙️ Dublado" else "🇯🇵 Legendado",
-                                color = Color.White,
-                                fontSize = 12.sp,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-                            )
+                            Box(
+                                contentAlignment = Alignment.Center,
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)
+                            ) {
+                                Text(
+                                    text = if (audioOption == "Dublado") "🎙️ Dublado" else "💬 Legendado",
+                                    color = Color.White,
+                                    fontSize = 12.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                                )
+                            }
                         }
                     }
                 }
 
-                // Grid vs Cards Toggle
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Surface(
-                        color = if (isGridView) accentColor else Color(0xFF22242B),
-                        shape = RoundedCornerShape(8.dp),
+                    IconButton(
+                        onClick = { isGridView = true },
                         modifier = Modifier
-                            .clickable { isGridView = true }
-                            .focusable()
+                            .size(48.dp)
+                            .background(if (isGridView) CrimsonPrimary else ObsidianCard, RoundedCornerShape(10.dp))
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.GridView,
-                            contentDescription = "Grade de Episódios",
-                            tint = Color.White,
-                            modifier = Modifier
-                                .padding(6.dp)
-                                .size(18.dp)
-                        )
+                        Icon(Icons.Default.GridView, contentDescription = "Grade de Episódios", tint = Color.White)
                     }
-                    Surface(
-                        color = if (!isGridView) accentColor else Color(0xFF22242B),
-                        shape = RoundedCornerShape(8.dp),
+                    IconButton(
+                        onClick = { isGridView = false },
                         modifier = Modifier
-                            .clickable { isGridView = false }
-                            .focusable()
+                            .size(48.dp)
+                            .background(if (!isGridView) CrimsonPrimary else ObsidianCard, RoundedCornerShape(10.dp))
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.ViewList,
-                            contentDescription = "Lista de Episódios",
-                            tint = Color.White,
-                            modifier = Modifier
-                                .padding(6.dp)
-                                .size(18.dp)
-                        )
+                        Icon(Icons.Default.ViewList, contentDescription = "Cartões de Episódios", tint = Color.White)
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(14.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
-            // 1. SEASONS SELECTOR (if multiple seasons exist)
+            // Season Selector
             if (seasons.size > 1) {
                 Text(
-                    text = "Temporadas (${seasons.size})",
-                    color = Color.LightGray,
-                    fontSize = 13.sp,
+                    text = "Mudar Temporada (${seasons.size} disponíveis)",
+                    color = TextSecondary,
+                    fontSize = 12.sp,
                     fontWeight = FontWeight.SemiBold
                 )
                 Spacer(modifier = Modifier.height(6.dp))
                 LazyRow(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    contentPadding = PaddingValues(end = 24.dp)
+                    contentPadding = PaddingValues(end = 16.dp)
                 ) {
                     items(seasons) { season ->
                         val isSelected = season == currentSeason
                         var isFocused by remember { mutableStateOf(false) }
 
                         Surface(
-                            color = if (isSelected) accentColor else if (isFocused) Color(0xFF333642) else Color(0xFF1E2028),
+                            onClick = { onSeasonSelect(season) },
+                            color = if (isSelected) CrimsonPrimary else if (isFocused) ObsidianCardElevated else ObsidianCard,
                             shape = RoundedCornerShape(10.dp),
-                            border = if (isFocused) BorderStroke(2.dp, Color.White) else null,
+                            border = BorderStroke(1.5.dp, if (isFocused) AmberGold else ObsidianStroke),
                             modifier = Modifier
+                                .heightIn(min = 48.dp)
                                 .onFocusChanged { isFocused = it.isFocused }
-                                .focusable()
-                                .clickable { onSeasonSelect(season) }
+                                .testTag("season_chip_$season")
                         ) {
-                            Text(
-                                text = "Temporada $season",
-                                color = Color.White,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                fontSize = 12.sp,
-                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp)
-                            )
+                            Box(
+                                contentAlignment = Alignment.Center,
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)
+                            ) {
+                                Text(
+                                    text = "Temporada $season",
+                                    color = Color.White,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                    fontSize = 12.sp
+                                )
+                            }
                         }
                     }
                 }
-                Spacer(modifier = Modifier.height(14.dp))
+                Spacer(modifier = Modifier.height(12.dp))
             }
 
-            // 2. EPISODES HEADER with SIDE BUTTONS
+            // Episodes Header
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -306,20 +355,16 @@ fun SeriesDetailsScreen(
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = if (isAnime) "Episódios do Anime" else "Episódios da Temporada $currentSeason",
-                        color = Color.White,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold
+                        text = "Episódios • Temporada $currentSeason",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = TextPrimary
                     )
                     if (seasonEpisodes.isNotEmpty()) {
                         Spacer(modifier = Modifier.width(8.dp))
-                        Surface(
-                            color = Color(0xFF22242B),
-                            shape = CircleShape
-                        ) {
+                        Surface(color = ObsidianCard, shape = CircleShape) {
                             Text(
                                 text = "${seasonEpisodes.size} eps",
-                                color = Color.LightGray,
+                                color = TextSecondary,
                                 fontSize = 11.sp,
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
                             )
@@ -328,172 +373,142 @@ fun SeriesDetailsScreen(
                 }
 
                 if (!isGridView && seasonEpisodes.size > 1) {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Surface(
-                            color = accentColor.copy(alpha = 0.2f),
-                            shape = RoundedCornerShape(8.dp),
-                            border = BorderStroke(1.dp, accentColor.copy(alpha = 0.4f)),
-                            modifier = Modifier
-                                .clickable {
-                                    scope.launch {
-                                        val target = (episodesListState.firstVisibleItemIndex - 2).coerceAtLeast(0)
-                                        episodesListState.animateScrollToItem(target)
-                                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        IconButton(
+                            onClick = {
+                                scope.launch {
+                                    val target = (episodesListState.firstVisibleItemIndex - 2).coerceAtLeast(0)
+                                    episodesListState.animateScrollToItem(target)
                                 }
-                                .focusable()
+                            },
+                            modifier = Modifier
+                                .size(48.dp)
+                                .background(ObsidianCard, CircleShape)
                         ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.ChevronLeft,
-                                    contentDescription = "Passar Ep Anterior",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Text("Ant", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                            }
+                            Icon(Icons.Default.ChevronLeft, contentDescription = "Episódios anteriores", tint = Color.White)
                         }
-
-                        Surface(
-                            color = accentColor,
-                            shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier
-                                .clickable {
-                                    scope.launch {
-                                        val target = (episodesListState.firstVisibleItemIndex + 2).coerceAtMost(seasonEpisodes.size - 1)
-                                        episodesListState.animateScrollToItem(target)
-                                    }
+                        IconButton(
+                            onClick = {
+                                scope.launch {
+                                    val target = (episodesListState.firstVisibleItemIndex + 2).coerceAtMost(seasonEpisodes.size - 1)
+                                    episodesListState.animateScrollToItem(target)
                                 }
-                                .focusable()
+                            },
+                            modifier = Modifier
+                                .size(48.dp)
+                                .background(CrimsonPrimary, CircleShape)
                         ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text("Próx", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                Icon(
-                                    imageVector = Icons.Default.ChevronRight,
-                                    contentDescription = "Passar Próximo Ep",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                            }
+                            Icon(Icons.Default.ChevronRight, contentDescription = "Próximos episódios", tint = Color.White)
                         }
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
-            // Episodes Content: Grid or Card Row
-            if (state.isLoading || state.isLoadingSeason) {
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        CircularProgressIndicator(color = accentColor)
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Text(
-                            text = if (isAnime) "Carregando episódios do AniChan..." else "Obtendo episódios...",
-                            color = Color.LightGray,
-                            fontSize = 13.sp
-                        )
-                    }
-                }
-            } else if (seasonEpisodes.isEmpty()) {
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(
-                            text = "Nenhum episódio listado no momento.",
-                            color = Color.LightGray,
-                            fontSize = 14.sp
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Button(
-                            onClick = { onSeasonSelect(currentSeason) },
-                            colors = ButtonDefaults.buttonColors(containerColor = accentColor)
-                        ) {
-                            Text("Recarregar Episódios", color = Color.White)
+            when {
+                state.isLoading || state.isLoadingSeason -> {
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            CircularProgressIndicator(color = CrimsonPrimary)
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Text("Carregando episódios...", color = TextSecondary, fontSize = 13.sp)
                         }
                     }
                 }
-            } else if (isGridView) {
-                // ANICHAN ANIME EPISODE GRID VIEW: Compact, rapid selection
-                LazyVerticalGrid(
-                    columns = GridCells.Adaptive(minSize = 70.dp),
-                    modifier = Modifier.weight(1f),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                    contentPadding = PaddingValues(bottom = 24.dp)
-                ) {
-                    itemsIndexed(seasonEpisodes) { index, ep ->
-                        var isFocused by remember { mutableStateOf(false) }
-                        Surface(
-                            onClick = { onEpisodeClick(ep) },
-                            color = if (isFocused) accentColor else Color(0xFF1E2028),
-                            shape = RoundedCornerShape(10.dp),
-                            border = if (isFocused) BorderStroke(2.5.dp, Color(0xFFFFD166)) else BorderStroke(1.dp, Color(0xFF2C2F3D)),
-                            modifier = Modifier
-                                .onFocusChanged { isFocused = it.isFocused }
-                                .onKeyEvent { keyEvent ->
-                                    if (keyEvent.type == KeyEventType.KeyUp && (
-                                        keyEvent.key == Key.DirectionCenter ||
-                                        keyEvent.key == Key.Enter ||
-                                        keyEvent.key == Key.NumPadEnter
-                                    )) {
-                                        onEpisodeClick(ep)
-                                        true
-                                    } else false
-                                }
-                        ) {
-                            Column(
-                                modifier = Modifier.padding(vertical = 12.dp, horizontal = 4.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally
+
+                seasonEpisodes.isEmpty() -> {
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("Nenhum episódio encontrado nesta temporada.", color = TextSecondary, fontSize = 14.sp)
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Button(
+                                onClick = { onSeasonSelect(currentSeason) },
+                                colors = ButtonDefaults.buttonColors(containerColor = CrimsonPrimary),
+                                modifier = Modifier.heightIn(min = 48.dp)
                             ) {
-                                Text(
-                                    text = "EP",
-                                    color = Color.Gray,
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Text(
-                                    text = "${ep.number}",
-                                    color = Color.White,
-                                    fontSize = 16.sp,
-                                    fontWeight = FontWeight.Black
-                                )
+                                Text("Recarregar Episódios")
                             }
                         }
                     }
                 }
-            } else {
-                // Detailed Horizontal Cards
-                LazyRow(
-                    state = episodesListState,
-                    modifier = Modifier.weight(1f),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
-                    contentPadding = PaddingValues(bottom = 20.dp, end = 40.dp)
-                ) {
-                    itemsIndexed(seasonEpisodes) { _, ep ->
-                        EpisodeCard(
-                            episode = ep,
-                            coverUrl = state.series.coverUrl,
-                            accentColor = accentColor,
-                            onClick = { onEpisodeClick(ep) }
-                        )
+
+                isGridView -> {
+                    LazyVerticalGrid(
+                        columns = GridCells.Adaptive(minSize = 84.dp),
+                        modifier = Modifier.weight(1f),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        contentPadding = PaddingValues(bottom = 18.dp)
+                    ) {
+                        itemsIndexed(seasonEpisodes) { _, ep ->
+                            val isEpWatched = watchedKeys.contains("${ep.season}x${ep.number}")
+                            val isCurrentStopped = historyItem?.season == ep.season && historyItem.episodeNumber == ep.number
+                            var isFocused by remember { mutableStateOf(false) }
+
+                            Surface(
+                                onClick = { onEpisodeClick(ep) },
+                                color = when {
+                                    isCurrentStopped -> CrimsonPrimary
+                                    isFocused -> ObsidianCardElevated
+                                    else -> ObsidianCard
+                                },
+                                shape = RoundedCornerShape(12.dp),
+                                border = BorderStroke(
+                                    width = if (isFocused) 2.5.dp else 1.dp,
+                                    color = when {
+                                        isFocused -> AmberGold
+                                        isEpWatched -> EmeraldAdBlock.copy(alpha = 0.6f)
+                                        else -> ObsidianStroke
+                                    }
+                                ),
+                                modifier = Modifier
+                                    .heightIn(min = 64.dp)
+                                    .onFocusChanged { isFocused = it.isFocused }
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(vertical = 10.dp, horizontal = 6.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.Center
+                                ) {
+                                    Text("EP ${ep.number}", color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Black)
+                                    if (isEpWatched) {
+                                        Text("Visto ✓", color = if (isCurrentStopped) Color.White else EmeraldAdBlock, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                else -> {
+                    LazyRow(
+                        state = episodesListState,
+                        modifier = Modifier.weight(1f),
+                        horizontalArrangement = Arrangement.spacedBy(14.dp),
+                        contentPadding = PaddingValues(bottom = 12.dp, end = 24.dp)
+                    ) {
+                        itemsIndexed(seasonEpisodes) { _, ep ->
+                            val isEpWatched = watchedKeys.contains("${ep.season}x${ep.number}")
+                            val isCurrentStopped = historyItem?.season == ep.season && historyItem.episodeNumber == ep.number
+                            EpisodeCard(
+                                episode = ep,
+                                coverUrl = state.series.coverUrl,
+                                isWatched = isEpWatched,
+                                isCurrent = isCurrentStopped,
+                                onClick = { onEpisodeClick(ep) }
+                            )
+                        }
                     }
                 }
             }
@@ -505,7 +520,8 @@ fun SeriesDetailsScreen(
 fun EpisodeCard(
     episode: Episode,
     coverUrl: String,
-    accentColor: Color = Color(0xFFE50914),
+    isWatched: Boolean = false,
+    isCurrent: Boolean = false,
     onClick: () -> Unit
 ) {
     var isFocused by remember { mutableStateOf(false) }
@@ -513,36 +529,35 @@ fun EpisodeCard(
     Card(
         onClick = onClick,
         modifier = Modifier
-            .width(260.dp)
+            .width(250.dp)
             .fillMaxHeight()
             .border(
-                width = if (isFocused) 3.5.dp else 0.dp,
-                color = if (isFocused) Color(0xFFFFD166) else Color.Transparent,
+                width = if (isFocused) 3.dp else 1.dp,
+                color = if (isFocused) AmberGold else if (isCurrent) CrimsonPrimary else ObsidianStroke,
                 shape = RoundedCornerShape(14.dp)
             )
             .onFocusChanged { isFocused = it.isFocused }
             .onKeyEvent { keyEvent ->
-                if ((keyEvent.type == KeyEventType.KeyUp || keyEvent.type == KeyEventType.KeyDown) && (
-                    keyEvent.key == Key.DirectionCenter ||
-                    keyEvent.key == Key.Enter ||
-                    keyEvent.key == Key.NumPadEnter
-                )) {
-                    if (keyEvent.type == KeyEventType.KeyDown) {
-                        onClick()
-                    }
+                if (keyEvent.type == KeyEventType.KeyDown && (
+                        keyEvent.key == Key.DirectionCenter ||
+                            keyEvent.key == Key.Enter ||
+                            keyEvent.key == Key.NumPadEnter
+                        )
+                ) {
+                    onClick()
                     true
                 } else false
             },
         shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF1B1D24)),
+        colors = CardDefaults.cardColors(containerColor = ObsidianCard),
         elevation = CardDefaults.cardElevation(defaultElevation = if (isFocused) 8.dp else 2.dp)
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(150.dp)
-                    .background(Color.DarkGray)
+                    .height(140.dp)
+                    .background(ObsidianCardElevated)
             ) {
                 AsyncImage(
                     model = coverUrl,
@@ -550,15 +565,13 @@ fun EpisodeCard(
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize()
                 )
-
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(Color.Black.copy(alpha = 0.4f))
+                        .background(Color.Black.copy(alpha = 0.35f))
                 )
-
                 Surface(
-                    color = Color.Black.copy(alpha = 0.7f),
+                    color = CrimsonPrimary.copy(alpha = 0.9f),
                     shape = CircleShape,
                     modifier = Modifier.align(Alignment.Center)
                 ) {
@@ -568,34 +581,50 @@ fun EpisodeCard(
                         tint = Color.White,
                         modifier = Modifier
                             .padding(10.dp)
-                            .size(28.dp)
+                            .size(26.dp)
                     )
                 }
 
                 Surface(
-                    color = accentColor,
+                    color = CrimsonPrimary,
                     shape = RoundedCornerShape(bottomEnd = 8.dp),
                     modifier = Modifier.align(Alignment.TopStart)
                 ) {
                     Text(
-                        text = "EP ${episode.number}",
+                        text = "T${episode.season} • EP ${episode.number}",
                         color = Color.White,
-                        fontSize = 11.sp,
+                        fontSize = 10.sp,
                         fontWeight = FontWeight.Black,
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
                     )
+                }
+
+                if (isWatched || isCurrent) {
+                    Surface(
+                        color = if (isCurrent) AmberGold else EmeraldAdBlock,
+                        shape = RoundedCornerShape(bottomStart = 8.dp),
+                        modifier = Modifier.align(Alignment.TopEnd)
+                    ) {
+                        Text(
+                            text = if (isCurrent) "PAROU AQUI" else "VISTO ✓",
+                            color = Color.Black,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Black,
+                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
+                        )
+                    }
                 }
             }
 
             Column(
                 modifier = Modifier
-                    .padding(14.dp)
+                    .padding(12.dp)
                     .weight(1f),
                 verticalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
                     text = "${episode.number}. ${episode.title}",
-                    color = Color.White,
+                    color = TextPrimary,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,
                     maxLines = 2,
@@ -608,21 +637,20 @@ fun EpisodeCard(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = if (episode.season > 1) "Temp ${episode.season} • Ep ${episode.number}" else "Episódio ${episode.number}",
-                        color = Color.Gray,
+                        text = episode.audio,
+                        color = TextSecondary,
                         fontSize = 11.sp
                     )
-
                     Surface(
-                        color = accentColor.copy(alpha = 0.2f),
-                        shape = RoundedCornerShape(4.dp)
+                        color = CrimsonPrimary.copy(alpha = 0.18f),
+                        shape = RoundedCornerShape(6.dp)
                     ) {
                         Text(
-                            text = "ASSISTIR",
-                            color = accentColor,
+                            text = if (isCurrent) "CONTINUAR" else "ASSISTIR",
+                            color = CrimsonPrimary,
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
                         )
                     }
                 }

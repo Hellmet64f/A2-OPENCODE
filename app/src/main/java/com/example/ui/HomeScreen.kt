@@ -1,278 +1,489 @@
 package com.example.ui
 
-import androidx.compose.animation.core.animateFloatAsState
+import android.content.Intent
+import android.net.Uri
+import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import android.content.Intent
-import android.net.Uri
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.example.R
 import com.example.model.AppState
 import com.example.model.Movie
 import com.example.model.WatchHistoryItem
+import com.example.model.WatchHistoryManager
+import com.example.network.AdBlockManager
+import com.example.ui.theme.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 @Composable
 fun NetflixHome(
     state: AppState.HomeLoaded,
+    userEmail: String?,
+    userName: String?,
+    adBlockRuleCount: Int,
+    adBlockBlockedSession: Int,
+    adBlockUpdating: Boolean,
+    adBlockAutoUpdate: Boolean,
     onMovieClick: (Movie) -> Unit,
     onLoadMore: () -> Unit,
+    onRefreshCatalog: () -> Unit,
     onOpenSearch: () -> Unit,
     onSelectCategory: (String) -> Unit,
     onSelectTab: (String) -> Unit,
-    onSelectAnimeGenre: (String) -> Unit = {},
-    onSelectAnimeAudio: (String) -> Unit = {},
     onPlayHistoryItem: (WatchHistoryItem) -> Unit = {},
+    onRestartHistoryItem: (WatchHistoryItem) -> Unit = {},
     onOpenHistoryDetails: (WatchHistoryItem) -> Unit = {},
+    onToggleFavoriteMovie: (Movie) -> Unit = {},
+    onToggleCompletedHistory: (WatchHistoryItem) -> Unit = {},
     onRemoveHistoryItem: (WatchHistoryItem) -> Unit = {},
-    onClearHistory: () -> Unit = {}
+    onClearHistory: () -> Unit = {},
+    onToggleAdBlockAutoUpdate: (Boolean) -> Unit = {},
+    onForceUpdateAdBlock: () -> Unit = {},
+    onSyncCloudNow: () -> Unit = {},
+    onImportJsonBackup: (String) -> Unit = {},
+    onSignOut: () -> Unit = {}
 ) {
-    var showCreditsDialog by remember { mutableStateOf(false) }
-    val isAnimeTab = state.currentTab == "Animes"
-    val isHistoryTab = state.currentTab == "MeusTitulos"
-    val currentList = if (isAnimeTab) state.animeMovies else state.allMovies
+    val context = LocalContext.current
+    var showDataAdBlockDialog by remember { mutableStateOf(false) }
 
-    val filteredMovies = if (isAnimeTab) {
-        currentList.filter { anime ->
-            val titleLower = anime.title.lowercase()
-            val matchesGenre = when (state.selectedAnimeGenre) {
-                "Todos" -> true
-                "Shonen" -> titleLower.contains("shippuden") || titleLower.contains("piece") ||
-                        titleLower.contains("bleach") || titleLower.contains("dragon") ||
-                        titleLower.contains("hunter") || titleLower.contains("jujutsu") ||
-                        titleLower.contains("hero") || titleLower.contains("naruto") ||
-                        titleLower.contains("boruto") || titleLower.contains("clover") ||
-                        anime.genre.contains("Shonen", true)
-                "Isekai" -> titleLower.contains("slime") || titleLower.contains("re:zero") ||
-                        titleLower.contains("sword art") || titleLower.contains("shield") ||
-                        titleLower.contains("overlord") || titleLower.contains("mushoku") ||
-                        titleLower.contains("isekai") || titleLower.contains("world") ||
-                        anime.genre.contains("Isekai", true)
-                "Ação" -> titleLower.contains("attack") || titleLower.contains("titan") ||
-                        titleLower.contains("solo") || titleLower.contains("demon") ||
-                        titleLower.contains("slayer") || titleLower.contains("chainsaw") ||
-                        titleLower.contains("fate") || titleLower.contains("tokyo") ||
-                        anime.genre.contains("Ação", true)
-                "Romance" -> titleLower.contains("kaguya") || titleLower.contains("horimiya") ||
-                        titleLower.contains("toradora") || titleLower.contains("dress-up") ||
-                        titleLower.contains("love") || titleLower.contains("shigatsu") ||
-                        anime.genre.contains("Romance", true)
-                "Fantasia" -> titleLower.contains("magic") || titleLower.contains("dungeon") ||
-                        titleLower.contains("fairy") || titleLower.contains("danmachi") ||
-                        titleLower.contains("frieren") || anime.genre.contains("Fantasia", true)
-                "Dublados" -> titleLower.contains("dub") || titleLower.contains("dublado") ||
-                        anime.audio.contains("Dub", true) || true
-                else -> true
-            }
-            val matchesAudio = when (state.selectedAnimeAudio) {
-                "Dublado" -> titleLower.contains("dub") || titleLower.contains("dublado") ||
-                        anime.audio.contains("Dub", true) || true
-                "Legendado" -> true
-                else -> true
-            }
-            matchesGenre && matchesAudio
+    val historyByUrl = remember(state.watchHistory) {
+        state.watchHistory.associateBy { it.id }
+    }
+
+    val displayedMovies = remember(state.allMovies, state.currentTab, state.selectedCategory, state.watchHistory) {
+        val base = when (state.currentTab) {
+            "Filmes" -> state.allMovies.filter { !it.isSeries }
+            "Series" -> state.allMovies.filter { it.isSeries }
+            else -> state.allMovies
         }
-    } else {
         when (state.selectedCategory) {
-            "Filmes" -> currentList.filter { !it.isSeries }
-            "Séries" -> currentList.filter { it.isSeries }
-            else -> currentList
+            "Filmes" -> base.filter { !it.isSeries }
+            "Séries" -> base.filter { it.isSeries }
+            "Favoritos" -> base.filter { m -> historyByUrl[m.url]?.favorite == true }
+            "Já Vistos" -> base.filter { m ->
+                val h = historyByUrl[m.url]
+                h != null && (h.completed || h.watchedEpisodes.isNotEmpty())
+            }
+            else -> base
         }
     }
 
-    val featuredMovie = filteredMovies.firstOrNull() ?: currentList.firstOrNull()
-    val trendingItems = remember(currentList) { currentList.take(12) }
-    val secondRowItems = remember(currentList) { currentList.drop(12).take(12) }
-    val catalogList = filteredMovies.take(state.visibleCount)
+    val featuredMovie = remember(displayedMovies, state.allMovies) {
+        displayedMovies.firstOrNull() ?: state.allMovies.firstOrNull()
+    }
+    val catalogList = remember(displayedMovies, state.visibleCount) {
+        displayedMovies.take(state.visibleCount)
+    }
 
     val firstCardFocusRequester = remember { FocusRequester() }
-
-    // Request initial focus on the first card whenever tab or filter changes
-    LaunchedEffect(state.currentTab, state.selectedCategory, state.selectedAnimeGenre, state.selectedAnimeAudio) {
-        delay(200)
+    LaunchedEffect(state.currentTab, state.selectedCategory) {
+        delay(180)
         try {
             firstCardFocusRequester.requestFocus()
         } catch (_: Exception) {}
     }
 
-    Column(
+    if (showDataAdBlockDialog) {
+        DataAndAdBlockDialog(
+            userEmail = userEmail,
+            userName = userName,
+            history = state.watchHistory,
+            adBlockRuleCount = adBlockRuleCount,
+            adBlockBlockedSession = adBlockBlockedSession,
+            adBlockUpdating = adBlockUpdating,
+            adBlockAutoUpdate = adBlockAutoUpdate,
+            onToggleAdBlockAutoUpdate = onToggleAdBlockAutoUpdate,
+            onForceUpdateAdBlock = onForceUpdateAdBlock,
+            onSyncCloudNow = onSyncCloudNow,
+            onImportJsonBackup = onImportJsonBackup,
+            onSignOut = {
+                showDataAdBlockDialog = false
+                onSignOut()
+            },
+            onDismiss = { showDataAdBlockDialog = false }
+        )
+    }
+
+    BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF0F0F12))
+            .background(ObsidianBg)
     ) {
-        if (showCreditsDialog) {
-            CreditsDialog(onDismiss = { showCreditsDialog = false })
-        }
+        val isWideScreen = maxWidth >= 680.dp
 
-        // 1. Top Bar: App brand, Credits, Search, and Tabs [🎬 Filmes | ⚡ Animes | 🕒 Meus Títulos]
-        HomeTopBar(
-            currentTab = state.currentTab,
-            onSelectTab = onSelectTab,
-            onOpenSearch = onOpenSearch,
-            onOpenCredits = { showCreditsDialog = true }
-        )
-
-        // 2. Sub-Category / Filter Pills in Header
-        if (!isHistoryTab) {
-            if (!isAnimeTab) {
-                CategoryTabs(
-                    selectedCategory = state.selectedCategory,
-                    onSelectCategory = onSelectCategory
-                )
-            } else {
-                AnimeGenreTabs(
-                    selectedGenre = state.selectedAnimeGenre,
-                    onSelectGenre = onSelectAnimeGenre
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                AnimeAudioTabs(
-                    selectedAudio = state.selectedAnimeAudio,
-                    onSelectAudio = onSelectAnimeAudio
-                )
-            }
-            Spacer(modifier = Modifier.height(6.dp))
-        }
-
-        // 3. Main Content: Direct Grid matching SearchScreen structure
-        if (isHistoryTab) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .weight(1f)
-            ) {
-                MyTitlesSection(
-                    history = state.watchHistory,
-                    onPlayItem = onPlayHistoryItem,
-                    onOpenDetails = onOpenHistoryDetails,
-                    onRemoveItem = onRemoveHistoryItem,
-                    onClearAll = onClearHistory,
-                    onExploreCatalog = { onSelectTab("Filmes") }
-                )
-            }
-        } else if (state.isLoadingAnime && isAnimeTab && catalogList.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .weight(1f)
-                    .padding(32.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    CircularProgressIndicator(color = Color(0xFF6C5CE7))
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text("Carregando catálogo AniChan...", color = Color.LightGray, fontSize = 14.sp)
-                }
-            }
-        } else if (catalogList.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .weight(1f)
-                    .padding(32.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(
-                        imageVector = Icons.Default.Search,
-                        contentDescription = null,
-                        tint = Color.Gray,
-                        modifier = Modifier.size(56.dp)
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        "Nenhum título encontrado nesta categoria",
-                        color = Color.White,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 16.sp
-                    )
-                }
-            }
-        } else {
-            LazyVerticalGrid(
-                columns = GridCells.Adaptive(minSize = 130.dp),
-                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 48.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier
-                    .fillMaxSize()
-                    .weight(1f)
-            ) {
-                itemsIndexed(catalogList, key = { index, movie -> if (movie.url.isNotBlank()) movie.url else "${movie.title}_$index" }) { index, movie ->
-                    MoviePosterCard(
-                        movie = movie,
-                        onClick = { onMovieClick(movie) },
-                        focusRequester = if (index == 0) firstCardFocusRequester else null
-                    )
-                }
-
-                if (state.visibleCount < filteredMovies.size) {
-                    item(span = { GridItemSpan(maxLineSpan) }) {
-                        Box(
+        Row(modifier = Modifier.fillMaxSize()) {
+            // Canonical NavigationRail for Tablets / TVs / Wide PC windows
+            if (isWideScreen) {
+                NavigationRail(
+                    containerColor = ObsidianSurface,
+                    contentColor = TextPrimary,
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .statusBarsPadding()
+                        .navigationBarsPadding(),
+                    header = {
+                        Image(
+                            painter = painterResource(id = R.drawable.ic_a2_logo),
+                            contentDescription = "A2 Miguel",
+                            contentScale = ContentScale.Crop,
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 24.dp),
-                            contentAlignment = Alignment.Center
+                                .padding(top = 10.dp)
+                                .size(44.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                        )
+                    }
+                ) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    NavigationRailItem(
+                        selected = state.currentTab == "Inicio",
+                        onClick = { onSelectTab("Inicio") },
+                        icon = { Icon(Icons.Default.Home, contentDescription = "Início") },
+                        label = { Text("Início", fontSize = 11.sp) },
+                        colors = NavigationRailItemDefaults.colors(
+                            selectedIconColor = Color.White,
+                            selectedTextColor = CrimsonPrimary,
+                            indicatorColor = CrimsonPrimary,
+                            unselectedIconColor = TextSecondary,
+                            unselectedTextColor = TextSecondary
+                        ),
+                        modifier = Modifier.testTag("nav_rail_inicio")
+                    )
+                    NavigationRailItem(
+                        selected = state.currentTab == "Filmes",
+                        onClick = { onSelectTab("Filmes") },
+                        icon = { Icon(Icons.Default.Movie, contentDescription = "Filmes") },
+                        label = { Text("Filmes", fontSize = 11.sp) },
+                        colors = NavigationRailItemDefaults.colors(
+                            selectedIconColor = Color.White,
+                            selectedTextColor = CrimsonPrimary,
+                            indicatorColor = CrimsonPrimary,
+                            unselectedIconColor = TextSecondary,
+                            unselectedTextColor = TextSecondary
+                        ),
+                        modifier = Modifier.testTag("nav_rail_filmes")
+                    )
+                    NavigationRailItem(
+                        selected = state.currentTab == "Series",
+                        onClick = { onSelectTab("Series") },
+                        icon = { Icon(Icons.Default.Tv, contentDescription = "Séries") },
+                        label = { Text("Séries", fontSize = 11.sp) },
+                        colors = NavigationRailItemDefaults.colors(
+                            selectedIconColor = Color.White,
+                            selectedTextColor = CrimsonPrimary,
+                            indicatorColor = CrimsonPrimary,
+                            unselectedIconColor = TextSecondary,
+                            unselectedTextColor = TextSecondary
+                        ),
+                        modifier = Modifier.testTag("nav_rail_series")
+                    )
+                    NavigationRailItem(
+                        selected = state.currentTab == "MeusTitulos",
+                        onClick = { onSelectTab("MeusTitulos") },
+                        icon = { Icon(Icons.Default.History, contentDescription = "Histórico") },
+                        label = { Text("Histórico", fontSize = 11.sp) },
+                        colors = NavigationRailItemDefaults.colors(
+                            selectedIconColor = Color.Black,
+                            selectedTextColor = EmeraldAdBlock,
+                            indicatorColor = EmeraldAdBlock,
+                            unselectedIconColor = TextSecondary,
+                            unselectedTextColor = TextSecondary
+                        ),
+                        modifier = Modifier.testTag("nav_rail_history")
+                    )
+                }
+            }
+
+            Scaffold(
+                containerColor = ObsidianBg,
+                contentWindowInsets = WindowInsets(0, 0, 0, 0),
+                bottomBar = {
+                    if (!isWideScreen) {
+                        NavigationBar(
+                            containerColor = ObsidianSurface,
+                            tonalElevation = 6.dp
                         ) {
-                            var isBtnFocused by remember { mutableStateOf(false) }
-                            Button(
-                                onClick = onLoadMore,
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = if (isAnimeTab) Color(0xFF6C5CE7) else Color(0xFFE50914)
+                            NavigationBarItem(
+                                selected = state.currentTab == "Inicio",
+                                onClick = { onSelectTab("Inicio") },
+                                icon = { Icon(Icons.Default.Home, contentDescription = "Início") },
+                                label = { Text("Início", maxLines = 1) },
+                                colors = NavigationBarItemDefaults.colors(
+                                    selectedIconColor = Color.White,
+                                    selectedTextColor = CrimsonPrimary,
+                                    indicatorColor = CrimsonPrimary,
+                                    unselectedIconColor = TextSecondary,
+                                    unselectedTextColor = TextSecondary
                                 ),
-                                shape = RoundedCornerShape(24.dp),
-                                border = if (isBtnFocused) BorderStroke(2.5.dp, Color(0xFFFFD166)) else null,
+                                modifier = Modifier.testTag("nav_bottom_inicio")
+                            )
+                            NavigationBarItem(
+                                selected = state.currentTab == "Filmes",
+                                onClick = { onSelectTab("Filmes") },
+                                icon = { Icon(Icons.Default.Movie, contentDescription = "Filmes") },
+                                label = { Text("Filmes", maxLines = 1) },
+                                colors = NavigationBarItemDefaults.colors(
+                                    selectedIconColor = Color.White,
+                                    selectedTextColor = CrimsonPrimary,
+                                    indicatorColor = CrimsonPrimary,
+                                    unselectedIconColor = TextSecondary,
+                                    unselectedTextColor = TextSecondary
+                                ),
+                                modifier = Modifier.testTag("nav_bottom_filmes")
+                            )
+                            NavigationBarItem(
+                                selected = state.currentTab == "Series",
+                                onClick = { onSelectTab("Series") },
+                                icon = { Icon(Icons.Default.Tv, contentDescription = "Séries") },
+                                label = { Text("Séries", maxLines = 1) },
+                                colors = NavigationBarItemDefaults.colors(
+                                    selectedIconColor = Color.White,
+                                    selectedTextColor = CrimsonPrimary,
+                                    indicatorColor = CrimsonPrimary,
+                                    unselectedIconColor = TextSecondary,
+                                    unselectedTextColor = TextSecondary
+                                ),
+                                modifier = Modifier.testTag("nav_bottom_series")
+                            )
+                            NavigationBarItem(
+                                selected = state.currentTab == "MeusTitulos",
+                                onClick = { onSelectTab("MeusTitulos") },
+                                icon = { Icon(Icons.Default.Bookmarks, contentDescription = "Salvos e Histórico") },
+                                label = { Text("Histórico", maxLines = 1) },
+                                colors = NavigationBarItemDefaults.colors(
+                                    selectedIconColor = Color.Black,
+                                    selectedTextColor = EmeraldAdBlock,
+                                    indicatorColor = EmeraldAdBlock,
+                                    unselectedIconColor = TextSecondary,
+                                    unselectedTextColor = TextSecondary
+                                ),
+                                modifier = Modifier.testTag("nav_bottom_history")
+                            )
+                        }
+                    }
+                },
+                modifier = Modifier.weight(1f)
+            ) { innerPadding ->
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(innerPadding)
+                ) {
+                    HomeTopBar(
+                        adBlockRuleCount = adBlockRuleCount,
+                        isRefreshingCatalog = state.isRefreshingCatalog,
+                        onOpenSearch = onOpenSearch,
+                        onRefreshCatalog = onRefreshCatalog,
+                        onOpenSettings = { showDataAdBlockDialog = true }
+                    )
+
+                    if (state.currentTab == "MeusTitulos") {
+                        MyTitlesSection(
+                            history = state.watchHistory,
+                            onPlayItem = onPlayHistoryItem,
+                            onRestartItem = onRestartHistoryItem,
+                            onOpenDetails = onOpenHistoryDetails,
+                            onToggleCompleted = onToggleCompletedHistory,
+                            onRemoveItem = onRemoveHistoryItem,
+                            onClearAll = onClearHistory,
+                            onExploreCatalog = { onSelectTab("Inicio") },
+                            onOpenCloudSettings = { showDataAdBlockDialog = true },
+                            modifier = Modifier.weight(1f)
+                        )
+                    } else {
+                        CategoryFilterChips(
+                            selectedCategory = state.selectedCategory,
+                            onSelectCategory = onSelectCategory
+                        )
+
+                        Spacer(modifier = Modifier.height(6.dp))
+
+                        if (catalogList.isEmpty()) {
+                            Box(
                                 modifier = Modifier
-                                    .onFocusChanged { isBtnFocused = it.isFocused }
-                                    .focusable(),
-                                contentPadding = PaddingValues(horizontal = 32.dp, vertical = 14.dp)
+                                    .fillMaxSize()
+                                    .weight(1f)
+                                    .padding(28.dp),
+                                contentAlignment = Alignment.Center
                             ) {
-                                Text(
-                                    "Carregar Mais Títulos",
-                                    color = Color.White,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 14.sp
-                                )
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Icon(
+                                        imageVector = Icons.Default.MovieFilter,
+                                        contentDescription = null,
+                                        tint = TextMuted,
+                                        modifier = Modifier.size(64.dp)
+                                    )
+                                    Spacer(modifier = Modifier.height(14.dp))
+                                    Text(
+                                        text = if (state.isRefreshingCatalog) "Atualizando catálogo..." else "Nenhum título encontrado neste filtro",
+                                        color = TextPrimary,
+                                        style = MaterialTheme.typography.titleLarge,
+                                        textAlign = TextAlign.Center
+                                    )
+                                    Spacer(modifier = Modifier.height(10.dp))
+                                    Button(
+                                        onClick = {
+                                            if (state.selectedCategory != "Tudo") {
+                                                onSelectCategory("Tudo")
+                                            } else {
+                                                onRefreshCatalog()
+                                            }
+                                        },
+                                        colors = ButtonDefaults.buttonColors(containerColor = CrimsonPrimary),
+                                        shape = RoundedCornerShape(12.dp),
+                                        modifier = Modifier.heightIn(min = 48.dp)
+                                    ) {
+                                        Text(
+                                            if (state.selectedCategory != "Tudo") "Mostrar Tudo" else "Recarregar Catálogo",
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                }
+                            }
+                        } else {
+                            LazyVerticalGrid(
+                                columns = GridCells.Adaptive(minSize = if (isWideScreen) 150.dp else 116.dp),
+                                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 24.dp),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                verticalArrangement = Arrangement.spacedBy(14.dp),
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .weight(1f)
+                            ) {
+                                // Hero Banner on "Inicio" tab when "Tudo" is selected
+                                if (state.currentTab == "Inicio" && state.selectedCategory == "Tudo" && featuredMovie != null) {
+                                    item(span = { GridItemSpan(maxLineSpan) }) {
+                                        val featuredHistory = historyByUrl[featuredMovie.url]
+                                        HeroBanner(
+                                            movie = featuredMovie,
+                                            isFavorite = featuredHistory?.favorite == true,
+                                            onPlayClick = { onMovieClick(featuredMovie) },
+                                            onToggleFavorite = { onToggleFavoriteMovie(featuredMovie) }
+                                        )
+                                    }
+                                }
+
+                                // "Continuar Assistindo" carousel directly on Início
+                                if (state.currentTab == "Inicio" && state.watchHistory.isNotEmpty() && state.selectedCategory == "Tudo") {
+                                    item(span = { GridItemSpan(maxLineSpan) }) {
+                                        ContinueWatchingCarousel(
+                                            history = state.watchHistory.take(12),
+                                            onPlayItem = onPlayHistoryItem,
+                                            onOpenDetails = onOpenHistoryDetails,
+                                            onSeeAll = { onSelectTab("MeusTitulos") }
+                                        )
+                                    }
+                                }
+
+                                item(span = { GridItemSpan(maxLineSpan) }) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(top = 4.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Text(
+                                            text = when (state.currentTab) {
+                                                "Filmes" -> "Filmes Disponíveis"
+                                                "Series" -> "Séries Completas"
+                                                else -> "Catálogo Completo (${displayedMovies.size})"
+                                            },
+                                            style = MaterialTheme.typography.titleLarge,
+                                            color = TextPrimary
+                                        )
+                                        Text(
+                                            text = "Exibindo ${catalogList.size}",
+                                            color = TextSecondary,
+                                            fontSize = 12.sp
+                                        )
+                                    }
+                                }
+
+                                itemsIndexed(
+                                    catalogList,
+                                    key = { index, movie -> if (movie.url.isNotBlank()) "${movie.url}_$index" else "${movie.title}_$index" }
+                                ) { index, movie ->
+                                    val hist = historyByUrl[movie.url]
+                                    MoviePosterCard(
+                                        movie = movie,
+                                        isFavorite = hist?.favorite == true,
+                                        isWatched = hist != null && (hist.completed || hist.watchedEpisodes.isNotEmpty()),
+                                        onClick = { onMovieClick(movie) },
+                                        focusRequester = if (index == 0) firstCardFocusRequester else null
+                                    )
+                                }
+
+                                if (state.visibleCount < displayedMovies.size) {
+                                    item(span = { GridItemSpan(maxLineSpan) }) {
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(vertical = 16.dp),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Button(
+                                                onClick = onLoadMore,
+                                                colors = ButtonDefaults.buttonColors(containerColor = CrimsonPrimary),
+                                                shape = RoundedCornerShape(24.dp),
+                                                modifier = Modifier
+                                                    .heightIn(min = 48.dp)
+                                                    .testTag("load_more_button"),
+                                                contentPadding = PaddingValues(horizontal = 28.dp, vertical = 12.dp)
+                                            ) {
+                                                Icon(Icons.Default.ExpandMore, contentDescription = null, modifier = Modifier.size(18.dp))
+                                                Spacer(modifier = Modifier.width(6.dp))
+                                                Text("Carregar Mais (${displayedMovies.size - catalogList.size} restantes)", fontWeight = FontWeight.Bold)
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
@@ -283,670 +494,168 @@ fun NetflixHome(
 }
 
 @Composable
-fun MyTitlesSection(
-    history: List<WatchHistoryItem>,
-    onPlayItem: (WatchHistoryItem) -> Unit,
-    onOpenDetails: (WatchHistoryItem) -> Unit,
-    onRemoveItem: (WatchHistoryItem) -> Unit,
-    onClearAll: () -> Unit,
-    onExploreCatalog: () -> Unit
+fun HomeTopBar(
+    adBlockRuleCount: Int,
+    isRefreshingCatalog: Boolean,
+    onOpenSearch: () -> Unit,
+    onRefreshCatalog: () -> Unit,
+    onOpenSettings: () -> Unit
 ) {
-    Column(
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 8.dp)
-    ) {
-        if (history.isEmpty()) {
-            // Empty State
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 60.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
-                ) {
-                    Surface(
-                        color = Color(0xFF1E2028),
-                        shape = CircleShape,
-                        modifier = Modifier.size(80.dp)
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(
-                                imageVector = Icons.Default.VideoLibrary,
-                                contentDescription = null,
-                                tint = Color(0xFFE50914),
-                                modifier = Modifier.size(38.dp)
-                            )
-                        }
-                    }
-                    Spacer(modifier = Modifier.height(20.dp))
-                    Text(
-                        text = "Nenhum título no seu histórico",
-                        color = Color.White,
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "Quando você assistir a filmes, séries ou animes, eles serão salvos aqui com o episódio exato onde você parou!",
-                        color = Color.Gray,
-                        fontSize = 13.sp,
-                        modifier = Modifier.padding(horizontal = 32.dp),
-                        lineHeight = 18.sp,
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                    )
-                    Spacer(modifier = Modifier.height(24.dp))
-                    Button(
-                        onClick = onExploreCatalog,
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE50914)),
-                        shape = RoundedCornerShape(12.dp),
-                        contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp)
-                    ) {
-                        Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("Explorar Catálogo", fontWeight = FontWeight.Bold)
-                    }
-                }
-            }
-        } else {
-            // Header with count & Clear button
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Column {
-                    Text(
-                        text = "Continuar Assistindo",
-                        color = Color.White,
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = "${history.size} títulos com progresso salvo",
-                        color = Color.Gray,
-                        fontSize = 12.sp
-                    )
-                }
-
-                TextButton(
-                    onClick = onClearAll,
-                    colors = ButtonDefaults.textButtonColors(contentColor = Color.LightGray)
-                ) {
-                    Icon(Icons.Default.DeleteSweep, contentDescription = "Limpar Tudo", modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Limpar", fontSize = 12.sp)
-                }
-            }
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            // History List
-            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                history.forEach { item ->
-                    WatchHistoryCard(
-                        item = item,
-                        onPlay = { onPlayItem(item) },
-                        onDetails = { onOpenDetails(item) },
-                        onRemove = { onRemoveItem(item) }
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun WatchHistoryCard(
-    item: WatchHistoryItem,
-    onPlay: () -> Unit,
-    onDetails: () -> Unit,
-    onRemove: () -> Unit
-) {
-    var isFocused by remember { mutableStateOf(false) }
-
-    Card(
-        onClick = onPlay,
-        modifier = Modifier
-            .fillMaxWidth()
-            .border(
-                width = if (isFocused) 3.5.dp else 1.dp,
-                color = if (isFocused) Color(0xFFFFD166) else Color(0xFF262936),
-                shape = RoundedCornerShape(16.dp)
-            )
-            .onFocusChanged { isFocused = it.isFocused }
-            .onKeyEvent { keyEvent ->
-                if (keyEvent.type == KeyEventType.KeyUp && (
-                    keyEvent.key == Key.DirectionCenter ||
-                    keyEvent.key == Key.Enter ||
-                    keyEvent.key == Key.NumPadEnter
-                )) {
-                    onPlay()
-                    true
-                } else false
-            },
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = if (isFocused) Color(0xFF262938) else Color(0xFF161822)),
-        elevation = CardDefaults.cardElevation(defaultElevation = if (isFocused) 6.dp else 2.dp)
+            .statusBarsPadding()
+            .padding(horizontal = 16.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
     ) {
         Row(
+            verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .clip(RoundedCornerShape(10.dp))
+                .clickable { onOpenSettings() }
+                .padding(4.dp)
         ) {
-            // Cover Image
-            Box(
+            Image(
+                painter = painterResource(id = R.drawable.ic_a2_logo),
+                contentDescription = "A2 Miguel",
+                contentScale = ContentScale.Crop,
                 modifier = Modifier
-                    .width(90.dp)
-                    .height(125.dp)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(Color(0xFF22242F))
-            ) {
-                AsyncImage(
-                    model = item.coverUrl,
-                    contentDescription = item.title,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
+                    .size(34.dp)
+                    .clip(RoundedCornerShape(8.dp))
+            )
+            Spacer(modifier = Modifier.width(10.dp))
+            Column {
+                Text(
+                    text = "A2 MIGUEL",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = CrimsonPrimary,
+                    letterSpacing = 1.sp
                 )
-                // Type badge
-                Surface(
-                    color = if (item.isAnime) Color(0xFF6C5CE7) else if (item.isSeries) Color(0xFFE50914) else Color(0xFF06D6A0),
-                    shape = RoundedCornerShape(bottomEnd = 6.dp),
-                    modifier = Modifier.align(Alignment.TopStart)
+                Text(
+                    text = "Filmes & Séries",
+                    color = TextSecondary,
+                    fontSize = 10.sp
+                )
+            }
+        }
+
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            // AdBlock + Salvar Dados Pill
+            Surface(
+                onClick = onOpenSettings,
+                color = EmeraldAdBlock.copy(alpha = 0.14f),
+                shape = RoundedCornerShape(20.dp),
+                border = BorderStroke(1.dp, EmeraldAdBlock.copy(alpha = 0.5f)),
+                modifier = Modifier
+                    .heightIn(min = 48.dp)
+                    .testTag("adblock_settings_button")
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
+                    Icon(
+                        imageVector = Icons.Default.Shield,
+                        contentDescription = "AdBlock e Dados na Nuvem",
+                        tint = EmeraldAdBlock,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(5.dp))
                     Text(
-                        text = if (item.isAnime) "ANIME" else if (item.isSeries) "SÉRIE" else "FILME",
-                        color = Color.White,
-                        fontSize = 8.sp,
-                        fontWeight = FontWeight.Black,
-                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                        text = "$adBlockRuleCount+ AdBlock",
+                        color = EmeraldAdBlock,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 11.sp
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.width(14.dp))
-
-            // Details and actions
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
+            IconButton(
+                onClick = onRefreshCatalog,
+                modifier = Modifier
+                    .size(48.dp)
+                    .background(ObsidianCard, CircleShape)
+                    .testTag("refresh_catalog_button")
             ) {
-                // Title
-                Text(
-                    text = item.title,
-                    color = Color.White,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-
-                // Episode Stopped Marker Badge
-                Surface(
-                    color = (if (item.isAnime) Color(0xFF6C5CE7) else Color(0xFFE50914)).copy(alpha = 0.2f),
-                    shape = RoundedCornerShape(6.dp),
-                    border = BorderStroke(1.dp, (if (item.isAnime) Color(0xFF6C5CE7) else Color(0xFFE50914)).copy(alpha = 0.5f))
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Bookmark,
-                            contentDescription = null,
-                            tint = if (item.isAnime) Color(0xFFA29BFE) else Color(0xFFFF6B6B),
-                            modifier = Modifier.size(12.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = if (item.isAnime) {
-                                "Parou no Episódio ${item.episodeNumber}"
-                            } else if (item.isSeries) {
-                                "Parou na Temp ${item.season} • Ep ${item.episodeNumber}"
-                            } else {
-                                "Assistido Recentemente"
-                            },
-                            color = Color.White,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
-
-                if (item.episodeTitle.isNotBlank() && item.episodeTitle != "Episódio ${item.episodeNumber}") {
-                    Text(
-                        text = item.episodeTitle,
-                        color = Color.LightGray,
-                        fontSize = 12.sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                if (isRefreshingCatalog) {
+                    CircularProgressIndicator(
+                        color = CrimsonPrimary,
+                        modifier = Modifier.size(18.dp),
+                        strokeWidth = 2.dp
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Default.Refresh,
+                        contentDescription = "Atualizar catálogo",
+                        tint = TextPrimary
                     )
                 }
+            }
 
-                Spacer(modifier = Modifier.height(4.dp))
-
-                // Actions: [ ▶ Continuar ] and [ Mudar Ep ] and [ Delete ]
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    // Direct Play Button
-                    Button(
-                        onClick = onPlay,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (item.isAnime) Color(0xFF6C5CE7) else Color(0xFFE50914)
-                        ),
-                        shape = RoundedCornerShape(8.dp),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.PlayArrow,
-                            contentDescription = null,
-                            tint = Color.White,
-                            modifier = Modifier.size(15.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = if (item.isSeries || item.isAnime) "Continuar Ep ${item.episodeNumber}" else "Assistir",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
-                        )
-                    }
-
-                    // Change Episode / Details
-                    if (item.isSeries || item.isAnime) {
-                        Surface(
-                            color = Color(0xFF222432),
-                            shape = RoundedCornerShape(8.dp),
-                            border = BorderStroke(1.dp, Color(0xFF333648)),
-                            modifier = Modifier
-                                .clickable { onDetails() }
-                                .focusable()
-                        ) {
-                            Text(
-                                text = "Mudar Ep",
-                                color = Color.White,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp)
-                            )
-                        }
-                    }
-
-                    // Remove item from history
-                    IconButton(
-                        onClick = onRemove,
-                        modifier = Modifier.size(32.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Close,
-                            contentDescription = "Remover do histórico",
-                            tint = Color.Gray,
-                            modifier = Modifier.size(16.dp)
-                        )
-                    }
-                }
+            IconButton(
+                onClick = onOpenSearch,
+                modifier = Modifier
+                    .size(48.dp)
+                    .background(CrimsonPrimary, CircleShape)
+                    .testTag("home_search_button")
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Search,
+                    contentDescription = "Buscar filmes e séries",
+                    tint = Color.White
+                )
             }
         }
     }
 }
 
 @Composable
-fun AnimeGenreTabs(
-    selectedGenre: String,
-    onSelectGenre: (String) -> Unit
+fun CategoryFilterChips(
+    selectedCategory: String,
+    onSelectCategory: (String) -> Unit
 ) {
-    val genres = listOf("Todos", "Shonen", "Isekai", "Ação", "Romance", "Fantasia", "Dublados")
+    val categories = listOf("Tudo", "Filmes", "Séries", "Favoritos", "Já Vistos")
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .horizontalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp),
+            .padding(horizontal = 16.dp, vertical = 4.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        genres.forEach { genre ->
-            val isSelected = selectedGenre == genre
-            var isFocused by remember { mutableStateOf(false) }
-            Surface(
-                color = if (isSelected) Color(0xFF6C5CE7) else if (isFocused) Color(0xFF333642) else Color(0xFF1E2028),
-                shape = RoundedCornerShape(16.dp),
-                border = if (isFocused) BorderStroke(2.dp, Color(0xFFFFD166)) else null,
-                modifier = Modifier
-                    .onFocusChanged { isFocused = it.isFocused }
-                    .focusable()
-                    .clickable { onSelectGenre(genre) }
-            ) {
-                Text(
-                    text = genre,
-                    color = Color.White,
-                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                    fontSize = 12.sp,
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp)
-                )
-            }
-        }
-    }
-}
-
-@Composable
-fun AnimeAudioTabs(
-    selectedAudio: String,
-    onSelectAudio: (String) -> Unit
-) {
-    val audios = listOf("Todos", "Dublado", "Legendado")
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        audios.forEach { audio ->
-            val isSelected = selectedAudio == audio
-            var isFocused by remember { mutableStateOf(false) }
-            Surface(
-                color = if (isSelected) Color(0xFFA29BFE).copy(alpha = 0.25f) else Color(0xFF161820),
-                shape = RoundedCornerShape(12.dp),
-                border = if (isFocused) BorderStroke(2.dp, Color(0xFFFFD166)) else BorderStroke(1.dp, if (isSelected) Color(0xFF6C5CE7) else Color(0xFF2E313D)),
-                modifier = Modifier
-                    .onFocusChanged { isFocused = it.isFocused }
-                    .focusable()
-                    .clickable { onSelectAudio(audio) }
-            ) {
-                Text(
-                    text = when (audio) {
-                        "Dublado" -> "🎙️ Dublado"
-                        "Legendado" -> "🇯🇵 Legendado"
-                        else -> "Todos os Áudios"
-                    },
-                    color = if (isSelected) Color(0xFFA29BFE) else Color.LightGray,
-                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                    fontSize = 11.sp,
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
-                )
-            }
-        }
-    }
-}
-
-@Composable
-fun HomeTopBar(
-    currentTab: String,
-    onSelectTab: (String) -> Unit,
-    onOpenSearch: () -> Unit,
-    onOpenCredits: () -> Unit
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .statusBarsPadding()
-            .padding(horizontal = 20.dp, vertical = 12.dp)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .clickable { onOpenCredits() }
-                    .focusable()
-            ) {
-                Text(
-                    text = "A2 Miguel",
-                    color = Color(0xFFE50914),
-                    fontSize = 21.sp,
-                    fontWeight = FontWeight.Black,
-                    letterSpacing = 1.sp
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                Surface(
-                    color = Color(0xFF6C5CE7).copy(alpha = 0.25f),
-                    shape = RoundedCornerShape(4.dp),
-                    border = BorderStroke(1.dp, Color(0xFF6C5CE7).copy(alpha = 0.5f))
-                ) {
-                    Text(
-                        text = "NO-ADS",
-                        color = Color(0xFFA29BFE),
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
-                    )
-                }
-            }
-
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                var isCreditsFocused by remember { mutableStateOf(false) }
-                Surface(
-                    color = if (isCreditsFocused) Color(0xFFE50914) else Color(0xFF22242B),
-                    shape = CircleShape,
-                    border = if (isCreditsFocused) BorderStroke(2.5.dp, Color(0xFFFFD166)) else null,
-                    modifier = Modifier
-                        .onFocusChanged { isCreditsFocused = it.isFocused }
-                        .clickable { onOpenCredits() }
-                        .focusable()
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Info,
-                            contentDescription = "Créditos",
-                            tint = if (isCreditsFocused) Color.White else Color(0xFFFFD166),
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = "Créditos",
-                            color = Color.White,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
-                }
-
-                var isSearchFocused by remember { mutableStateOf(false) }
-                Surface(
-                    color = if (isSearchFocused) Color(0xFFE50914) else Color(0xFF22242B),
-                    shape = CircleShape,
-                    border = if (isSearchFocused) BorderStroke(2.5.dp, Color(0xFFFFD166)) else null,
-                    modifier = Modifier
-                        .onFocusChanged { isSearchFocused = it.isFocused }
-                        .clickable { onOpenSearch() }
-                        .focusable()
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Search,
-                            contentDescription = "Pesquisar",
-                            tint = Color.White,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = "Buscar",
-                            color = Color.White,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        // Main Navigation Tabs: [ Filmes & Séries ] | [ Animes (AniChan) ] | [ Meus Títulos ]
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            val isFilmes = currentTab == "Filmes"
-            val isAnimes = currentTab == "Animes"
-            val isMeusTitulos = currentTab == "MeusTitulos"
-
-            // 1. Filmes & Séries
-            var isFilmesFocused by remember { mutableStateOf(false) }
-            Surface(
-                onClick = { onSelectTab("Filmes") },
-                color = if (isFilmes) Color(0xFFE50914) else if (isFilmesFocused) Color(0xFF2E3345) else Color(0xFF1E2028),
-                shape = RoundedCornerShape(12.dp),
-                border = if (isFilmesFocused) BorderStroke(2.5.dp, Color(0xFFFFD166)) else null,
-                modifier = Modifier
-                    .weight(1f)
-                    .onFocusChanged { isFilmesFocused = it.isFocused }
-                    .onKeyEvent { keyEvent ->
-                        if (keyEvent.type == KeyEventType.KeyUp && (
-                            keyEvent.key == Key.DirectionCenter ||
-                            keyEvent.key == Key.Enter ||
-                            keyEvent.key == Key.NumPadEnter
-                        )) {
-                            onSelectTab("Filmes")
-                            true
-                        } else false
-                    }
-            ) {
-                Box(
-                    modifier = Modifier.padding(vertical = 10.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "🎬 Filmes",
-                        color = Color.White,
-                        fontWeight = if (isFilmes || isFilmesFocused) FontWeight.Bold else FontWeight.Medium,
-                        fontSize = 12.sp
-                    )
-                }
-            }
-
-            // 2. Animes
-            var isAnimesFocused by remember { mutableStateOf(false) }
-            Surface(
-                onClick = { onSelectTab("Animes") },
-                color = if (isAnimes) Color(0xFF6C5CE7) else if (isAnimesFocused) Color(0xFF2E3345) else Color(0xFF1E2028),
-                shape = RoundedCornerShape(12.dp),
-                border = if (isAnimesFocused) BorderStroke(2.5.dp, Color(0xFFFFD166)) else null,
-                modifier = Modifier
-                    .weight(1f)
-                    .onFocusChanged { isAnimesFocused = it.isFocused }
-                    .onKeyEvent { keyEvent ->
-                        if (keyEvent.type == KeyEventType.KeyUp && (
-                            keyEvent.key == Key.DirectionCenter ||
-                            keyEvent.key == Key.Enter ||
-                            keyEvent.key == Key.NumPadEnter
-                        )) {
-                            onSelectTab("Animes")
-                            true
-                        } else false
-                    }
-            ) {
-                Box(
-                    modifier = Modifier.padding(vertical = 10.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "⚡ Animes",
-                        color = Color.White,
-                        fontWeight = if (isAnimes || isAnimesFocused) FontWeight.Bold else FontWeight.Medium,
-                        fontSize = 12.sp
-                    )
-                }
-            }
-
-            // 3. Meus Títulos (Histórico e Onde Parou)
-            var isHistoryFocused by remember { mutableStateOf(false) }
-            Surface(
-                onClick = { onSelectTab("MeusTitulos") },
-                color = if (isMeusTitulos) Color(0xFF06D6A0) else if (isHistoryFocused) Color(0xFF2E3345) else Color(0xFF1E2028),
-                shape = RoundedCornerShape(12.dp),
-                border = if (isHistoryFocused) BorderStroke(2.5.dp, Color(0xFFFFD166)) else null,
-                modifier = Modifier
-                    .weight(1.1f)
-                    .onFocusChanged { isHistoryFocused = it.isFocused }
-                    .onKeyEvent { keyEvent ->
-                        if (keyEvent.type == KeyEventType.KeyUp && (
-                            keyEvent.key == Key.DirectionCenter ||
-                            keyEvent.key == Key.Enter ||
-                            keyEvent.key == Key.NumPadEnter
-                        )) {
-                            onSelectTab("MeusTitulos")
-                            true
-                        } else false
-                    }
-            ) {
-                Box(
-                    modifier = Modifier.padding(vertical = 10.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "🕒 Meus Títulos",
-                        color = if (isMeusTitulos) Color.Black else Color.White,
-                        fontWeight = if (isMeusTitulos || isHistoryFocused) FontWeight.ExtraBold else FontWeight.Medium,
-                        fontSize = 12.sp
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun CategoryTabs(
-    selectedCategory: String,
-    onSelectCategory: (String) -> Unit
-) {
-    val categories = listOf("Tudo", "Filmes", "Séries")
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp),
-        horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         categories.forEach { cat ->
             val isSelected = selectedCategory == cat
             var isFocused by remember { mutableStateOf(false) }
-            Surface(
+            FilterChip(
+                selected = isSelected,
                 onClick = { onSelectCategory(cat) },
-                color = if (isSelected) Color(0xFFE50914) else if (isFocused) Color(0xFF333642) else Color(0xFF1E2028),
-                shape = RoundedCornerShape(20.dp),
-                border = if (isFocused) BorderStroke(2.dp, Color(0xFFFFD166)) else null,
+                label = {
+                    Text(
+                        text = cat,
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                        fontSize = 12.sp
+                    )
+                },
+                colors = FilterChipDefaults.filterChipColors(
+                    selectedContainerColor = if (cat == "Já Vistos") EmeraldAdBlock else if (cat == "Favoritos") AmberGold else CrimsonPrimary,
+                    selectedLabelColor = if (cat == "Favoritos" || cat == "Já Vistos") Color.Black else Color.White,
+                    containerColor = ObsidianCard,
+                    labelColor = TextSecondary
+                ),
+                border = FilterChipDefaults.filterChipBorder(
+                    enabled = true,
+                    selected = isSelected,
+                    borderColor = if (isFocused) AmberGold else ObsidianStroke,
+                    borderWidth = if (isFocused) 2.dp else 1.dp
+                ),
                 modifier = Modifier
+                    .heightIn(min = 48.dp)
                     .onFocusChanged { isFocused = it.isFocused }
-                    .onKeyEvent { keyEvent ->
-                        if (keyEvent.type == KeyEventType.KeyUp && (
-                            keyEvent.key == Key.DirectionCenter ||
-                            keyEvent.key == Key.Enter ||
-                            keyEvent.key == Key.NumPadEnter
-                        )) {
-                            onSelectCategory(cat)
-                            true
-                        } else false
-                    }
-            ) {
-                Text(
-                    text = cat,
-                    color = Color.White,
-                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                    fontSize = 13.sp,
-                    modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp)
-                )
-            }
+                    .testTag("category_chip_${cat.lowercase().replace(" ", "_")}")
+            )
         }
     }
 }
@@ -954,25 +663,26 @@ fun CategoryTabs(
 @Composable
 fun HeroBanner(
     movie: Movie,
-    isAnime: Boolean,
-    onClick: () -> Unit
+    isFavorite: Boolean,
+    onPlayClick: () -> Unit,
+    onToggleFavorite: () -> Unit
 ) {
     var isFocused by remember { mutableStateOf(false) }
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(280.dp)
-            .padding(horizontal = 20.dp, vertical = 8.dp)
-            .clip(RoundedCornerShape(16.dp))
+            .height(250.dp)
+            .clip(RoundedCornerShape(18.dp))
             .border(
-                width = if (isFocused) 3.5.dp else 0.dp,
-                color = if (isFocused) Color.White else Color.Transparent,
-                shape = RoundedCornerShape(16.dp)
+                width = if (isFocused) 3.dp else 1.dp,
+                color = if (isFocused) AmberGold else ObsidianStroke,
+                shape = RoundedCornerShape(18.dp)
             )
             .onFocusChanged { isFocused = it.isFocused }
             .focusable()
-            .clickable { onClick() }
+            .clickable { onPlayClick() }
+            .testTag("hero_banner_card")
     ) {
         AsyncImage(
             model = movie.coverUrl,
@@ -987,8 +697,8 @@ fun HeroBanner(
                     Brush.verticalGradient(
                         colors = listOf(
                             Color.Transparent,
-                            Color.Black.copy(alpha = 0.5f),
-                            Color(0xFF0F0F12).copy(alpha = 0.95f)
+                            ObsidianBg.copy(alpha = 0.45f),
+                            ObsidianBg.copy(alpha = 0.96f)
                         )
                     )
                 )
@@ -996,32 +706,35 @@ fun HeroBanner(
         Column(
             modifier = Modifier
                 .align(Alignment.BottomStart)
-                .padding(20.dp)
+                .padding(18.dp)
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 Surface(
-                    color = if (isAnime) Color(0xFF6C5CE7) else Color(0xFFE50914),
-                    shape = RoundedCornerShape(4.dp)
+                    color = CrimsonPrimary,
+                    shape = RoundedCornerShape(6.dp)
                 ) {
                     Text(
-                        text = if (isAnime) "ANIME DESTAQUE" else if (movie.isSeries) "SÉRIE EM DESTAQUE" else "DESTAQUE",
+                        text = if (movie.isSeries) "SÉRIE EM DESTAQUE" else "FILME EM DESTAQUE",
                         color = Color.White,
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Black,
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
                     )
                 }
-                Spacer(modifier = Modifier.width(8.dp))
                 Surface(
-                    color = Color.Black.copy(alpha = 0.6f),
-                    shape = RoundedCornerShape(4.dp)
+                    color = EmeraldAdBlock.copy(alpha = 0.22f),
+                    shape = RoundedCornerShape(6.dp),
+                    border = BorderStroke(1.dp, EmeraldAdBlock.copy(alpha = 0.6f))
                 ) {
                     Text(
-                        text = if (isAnime) "SUB & DUB" else "FULL HD",
-                        color = Color.LightGray,
+                        text = "HD • SEM ANÚNCIOS",
+                        color = EmeraldAdBlock,
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
+                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
                     )
                 }
             }
@@ -1030,122 +743,143 @@ fun HeroBanner(
 
             Text(
                 text = movie.title,
-                color = Color.White,
-                fontSize = 22.sp,
-                fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.headlineSmall,
+                color = TextPrimary,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis
             )
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            Button(
-                onClick = onClick,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = if (isAnime) Color(0xFF6C5CE7) else Color(0xFFE50914)
-                ),
-                shape = RoundedCornerShape(8.dp),
-                contentPadding = PaddingValues(horizontal = 18.dp, vertical = 8.dp)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                Icon(
-                    imageVector = Icons.Default.PlayArrow,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp),
-                    tint = Color.White
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    text = if (movie.isSeries || isAnime) "Ver Episódios" else "Assistir Agora",
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp
-                )
+                Button(
+                    onClick = onPlayClick,
+                    colors = ButtonDefaults.buttonColors(containerColor = CrimsonPrimary),
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.heightIn(min = 48.dp)
+                ) {
+                    Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = if (movie.isSeries) "Ver Temporadas & Episódios" else "Assistir Agora",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp
+                    )
+                }
+
+                IconButton(
+                    onClick = onToggleFavorite,
+                    modifier = Modifier
+                        .size(48.dp)
+                        .background(ObsidianCardElevated.copy(alpha = 0.85f), CircleShape)
+                ) {
+                    Icon(
+                        imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                        contentDescription = if (isFavorite) "Remover favorito" else "Salvar favorito",
+                        tint = if (isFavorite) AmberGold else Color.White
+                    )
+                }
             }
         }
     }
 }
 
 @Composable
-fun SectionCarousel(
-    title: String,
-    movies: List<Movie>,
-    onMovieClick: (Movie) -> Unit
+fun ContinueWatchingCarousel(
+    history: List<WatchHistoryItem>,
+    onPlayItem: (WatchHistoryItem) -> Unit,
+    onOpenDetails: (WatchHistoryItem) -> Unit,
+    onSeeAll: () -> Unit
 ) {
-    val listState = rememberLazyListState()
-    val scope = rememberCoroutineScope()
-
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = title,
-                color = Color.White,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Surface(
-                    color = Color(0xFF22242B),
-                    shape = CircleShape,
-                    modifier = Modifier
-                        .size(32.dp)
-                        .clickable {
-                            scope.launch {
-                                val next = (listState.firstVisibleItemIndex - 3).coerceAtLeast(0)
-                                listState.animateScrollToItem(next)
-                            }
-                        }
-                        .focusable()
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.ChevronLeft,
-                        contentDescription = "Anterior",
-                        tint = Color.White,
-                        modifier = Modifier.padding(6.dp)
-                    )
-                }
-
-                Surface(
-                    color = Color(0xFF22242B),
-                    shape = CircleShape,
-                    modifier = Modifier
-                        .size(32.dp)
-                        .clickable {
-                            scope.launch {
-                                val next = (listState.firstVisibleItemIndex + 3).coerceAtMost(movies.size - 1)
-                                listState.animateScrollToItem(next)
-                            }
-                        }
-                        .focusable()
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.ChevronRight,
-                        contentDescription = "Próximo",
-                        tint = Color.White,
-                        modifier = Modifier.padding(6.dp)
-                    )
-                }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.PlayCircle, contentDescription = null, tint = EmeraldAdBlock, modifier = Modifier.size(20.dp))
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = "Continuar Assistindo",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = TextPrimary
+                )
+            }
+            TextButton(onClick = onSeeAll) {
+                Text("Ver Tudo", color = CrimsonPrimary, fontWeight = FontWeight.Bold, fontSize = 12.sp)
             }
         }
-
-        Spacer(modifier = Modifier.height(10.dp))
-
+        Spacer(modifier = Modifier.height(6.dp))
         LazyRow(
-            state = listState,
-            contentPadding = PaddingValues(horizontal = 20.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            items(movies) { movie ->
-                Box(modifier = Modifier.width(130.dp)) {
-                    MoviePosterCard(
-                        movie = movie,
-                        onClick = { onMovieClick(movie) }
-                    )
+            items(history, key = { it.id }) { item ->
+                Card(
+                    onClick = { onPlayItem(item) },
+                    shape = RoundedCornerShape(14.dp),
+                    colors = CardDefaults.cardColors(containerColor = ObsidianCard),
+                    border = BorderStroke(1.dp, ObsidianStroke),
+                    modifier = Modifier
+                        .width(210.dp)
+                        .testTag("continue_card_${item.title.take(12)}")
+                ) {
+                    Row(
+                        modifier = Modifier.padding(10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        AsyncImage(
+                            model = item.coverUrl,
+                            contentDescription = item.title,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .width(58.dp)
+                                .height(84.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(ObsidianCardElevated)
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = item.title,
+                                color = TextPrimary,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = if (item.isSeries) "T${item.season} • Ep ${item.episodeNumber}" else "Filme",
+                                color = AmberGold,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 11.sp
+                            )
+                            if (item.watchedEpisodes.isNotEmpty()) {
+                                Text(
+                                    text = "${item.watchedEpisodes.size} eps vistos",
+                                    color = EmeraldAdBlock,
+                                    fontSize = 10.sp
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(6.dp))
+                            if (item.isSeries) {
+                                Text(
+                                    text = "Trocar ep / temp →",
+                                    color = CyanAccent,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .clickable { onOpenDetails(item) }
+                                        .padding(vertical = 2.dp)
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -1155,6 +889,8 @@ fun SectionCarousel(
 @Composable
 fun MoviePosterCard(
     movie: Movie,
+    isFavorite: Boolean = false,
+    isWatched: Boolean = false,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     focusRequester: FocusRequester? = null
@@ -1165,9 +901,9 @@ fun MoviePosterCard(
         .fillMaxWidth()
         .aspectRatio(0.67f)
         .border(
-            width = if (isFocused) 3.5.dp else 0.dp,
-            color = if (isFocused) Color(0xFFFFD166) else Color.Transparent,
-            shape = RoundedCornerShape(10.dp)
+            width = if (isFocused) 3.dp else 1.dp,
+            color = if (isFocused) AmberGold else ObsidianStroke.copy(alpha = 0.6f),
+            shape = RoundedCornerShape(12.dp)
         )
         .onFocusChanged { isFocused = it.isFocused }
 
@@ -1181,19 +917,18 @@ fun MoviePosterCard(
         onClick = onClick,
         modifier = focusableModifier
             .onKeyEvent { keyEvent ->
-                if ((keyEvent.type == KeyEventType.KeyUp || keyEvent.type == KeyEventType.KeyDown) && (
-                    keyEvent.key == Key.DirectionCenter ||
-                    keyEvent.key == Key.Enter ||
-                    keyEvent.key == Key.NumPadEnter
-                )) {
-                    if (keyEvent.type == KeyEventType.KeyDown) {
-                        onClick()
-                    }
+                if (keyEvent.type == KeyEventType.KeyDown && (
+                        keyEvent.key == Key.DirectionCenter ||
+                            keyEvent.key == Key.Enter ||
+                            keyEvent.key == Key.NumPadEnter
+                        )
+                ) {
+                    onClick()
                     true
                 } else false
             },
-        shape = RoundedCornerShape(10.dp),
-        colors = CardDefaults.cardColors(containerColor = if (isFocused) Color(0xFF2E3244) else Color(0xFF1E2028)),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = if (isFocused) ObsidianCardElevated else ObsidianCard),
         elevation = CardDefaults.cardElevation(defaultElevation = if (isFocused) 8.dp else 2.dp)
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
@@ -1204,33 +939,59 @@ fun MoviePosterCard(
                 modifier = Modifier.fillMaxSize()
             )
 
-            if (movie.isAnime) {
-                Surface(
-                    color = Color(0xFF6C5CE7),
-                    shape = RoundedCornerShape(bottomEnd = 6.dp),
-                    modifier = Modifier.align(Alignment.TopStart)
-                ) {
-                    Text(
-                        text = "ANIME",
-                        color = Color.White,
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Black,
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                    )
+            // Type Badge (SÉRIE / FILME)
+            Surface(
+                color = if (movie.isSeries) CrimsonPrimary else CyanAccent,
+                shape = RoundedCornerShape(bottomEnd = 8.dp),
+                modifier = Modifier.align(Alignment.TopStart)
+            ) {
+                Text(
+                    text = if (movie.isSeries) "SÉRIE" else "FILME",
+                    color = if (movie.isSeries) Color.White else Color.Black,
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Black,
+                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
+                )
+            }
+
+            // Watched or Favorite indicators
+            Row(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(6.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                if (isWatched) {
+                    Surface(
+                        color = EmeraldAdBlock,
+                        shape = CircleShape,
+                        modifier = Modifier.size(20.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Default.Check,
+                                contentDescription = "Já visto",
+                                tint = Color.Black,
+                                modifier = Modifier.size(13.dp)
+                            )
+                        }
+                    }
                 }
-            } else if (movie.isSeries) {
-                Surface(
-                    color = Color(0xFFE50914),
-                    shape = RoundedCornerShape(bottomEnd = 6.dp),
-                    modifier = Modifier.align(Alignment.TopStart)
-                ) {
-                    Text(
-                        text = "SÉRIE",
-                        color = Color.White,
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Black,
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                    )
+                if (isFavorite) {
+                    Surface(
+                        color = ObsidianBg.copy(alpha = 0.85f),
+                        shape = CircleShape,
+                        modifier = Modifier.size(20.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Default.Favorite,
+                                contentDescription = "Favorito",
+                                tint = AmberGold,
+                                modifier = Modifier.size(12.dp)
+                            )
+                        }
+                    }
                 }
             }
 
@@ -1240,17 +1001,17 @@ fun MoviePosterCard(
                     .align(Alignment.BottomCenter)
                     .background(
                         Brush.verticalGradient(
-                            colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.95f))
+                            colors = listOf(Color.Transparent, ObsidianBg.copy(alpha = 0.96f))
                         )
                     )
                     .padding(horizontal = 8.dp, vertical = 8.dp)
             ) {
                 Text(
                     text = movie.title,
-                    color = Color.White,
+                    color = TextPrimary,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
             }
@@ -1259,156 +1020,620 @@ fun MoviePosterCard(
 }
 
 @Composable
-fun CreditsDialog(onDismiss: () -> Unit) {
-    val context = LocalContext.current
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = Color(0xFF161822),
-        titleContentColor = Color.White,
-        textContentColor = Color.LightGray,
-        shape = RoundedCornerShape(20.dp),
-        title = {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = "A2 Miguel",
-                    fontWeight = FontWeight.Black,
-                    color = Color(0xFFE50914),
-                    fontSize = 20.sp
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Surface(
-                    color = Color(0xFF6C5CE7).copy(alpha = 0.2f),
-                    shape = RoundedCornerShape(6.dp),
-                    border = BorderStroke(1.dp, Color(0xFF6C5CE7))
-                ) {
+fun MyTitlesSection(
+    history: List<WatchHistoryItem>,
+    onPlayItem: (WatchHistoryItem) -> Unit,
+    onRestartItem: (WatchHistoryItem) -> Unit,
+    onOpenDetails: (WatchHistoryItem) -> Unit,
+    onToggleCompleted: (WatchHistoryItem) -> Unit,
+    onRemoveItem: (WatchHistoryItem) -> Unit,
+    onClearAll: () -> Unit,
+    onExploreCatalog: () -> Unit,
+    onOpenCloudSettings: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+    ) {
+        if (history.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 48.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Surface(
+                        color = ObsidianCard,
+                        shape = CircleShape,
+                        modifier = Modifier.size(84.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Default.VideoLibrary,
+                                contentDescription = null,
+                                tint = CrimsonPrimary,
+                                modifier = Modifier.size(40.dp)
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(18.dp))
                     Text(
-                        text = "CRÉDITOS",
-                        color = Color(0xFFA29BFE),
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        text = "Seu histórico está vazio",
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = TextPrimary
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "Filmes e séries que você assistir ou favoritar aparecem aqui com os episódios vistos salvos na nuvem gratuitamente.",
+                        color = TextSecondary,
+                        fontSize = 13.sp,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(horizontal = 24.dp)
+                    )
+                    Spacer(modifier = Modifier.height(20.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Button(
+                            onClick = onExploreCatalog,
+                            colors = ButtonDefaults.buttonColors(containerColor = CrimsonPrimary),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.heightIn(min = 48.dp)
+                        ) {
+                            Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Explorar Catálogo", fontWeight = FontWeight.Bold)
+                        }
+                        OutlinedButton(
+                            onClick = onOpenCloudSettings,
+                            shape = RoundedCornerShape(12.dp),
+                            border = BorderStroke(1.dp, ObsidianStroke),
+                            modifier = Modifier.heightIn(min = 48.dp)
+                        ) {
+                            Icon(Icons.Default.CloudDownload, contentDescription = null, tint = EmeraldAdBlock, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Importar JSON", color = TextPrimary)
+                        }
+                    }
+                }
+            }
+        } else {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column {
+                    Text(
+                        text = "Histórico & Já Vistos",
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = TextPrimary
+                    )
+                    Text(
+                        text = "${history.size} títulos salvos na sua conta gratuita",
+                        color = TextSecondary,
+                        fontSize = 12.sp
+                    )
+                }
+
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(
+                        onClick = onOpenCloudSettings,
+                        shape = RoundedCornerShape(10.dp),
+                        border = BorderStroke(1.dp, EmeraldAdBlock.copy(alpha = 0.5f)),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                        modifier = Modifier.heightIn(min = 48.dp)
+                    ) {
+                        Icon(Icons.Default.CloudDone, contentDescription = null, tint = EmeraldAdBlock, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Backup", color = EmeraldAdBlock, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    }
+                    TextButton(
+                        onClick = onClearAll,
+                        colors = ButtonDefaults.textButtonColors(contentColor = TextSecondary),
+                        modifier = Modifier.heightIn(min = 48.dp)
+                    ) {
+                        Icon(Icons.Default.DeleteSweep, contentDescription = "Limpar Tudo", modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Limpar", fontSize = 12.sp)
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                history.forEach { item ->
+                    WatchHistoryCard(
+                        item = item,
+                        onPlay = { onPlayItem(item) },
+                        onRestart = { onRestartItem(item) },
+                        onDetails = { onOpenDetails(item) },
+                        onToggleCompleted = { onToggleCompleted(item) },
+                        onRemove = { onRemoveItem(item) }
                     )
                 }
             }
-        },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        }
+        Spacer(modifier = Modifier.height(24.dp))
+    }
+}
+
+@Composable
+fun WatchHistoryCard(
+    item: WatchHistoryItem,
+    onPlay: () -> Unit,
+    onRestart: () -> Unit,
+    onDetails: () -> Unit,
+    onToggleCompleted: () -> Unit,
+    onRemove: () -> Unit
+) {
+    var isFocused by remember { mutableStateOf(false) }
+
+    Card(
+        onClick = onPlay,
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(
+                width = if (isFocused) 2.5.dp else 1.dp,
+                color = if (isFocused) AmberGold else ObsidianStroke,
+                shape = RoundedCornerShape(16.dp)
+            )
+            .onFocusChanged { isFocused = it.isFocused },
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = if (isFocused) ObsidianCardElevated else ObsidianCard),
+        elevation = CardDefaults.cardElevation(defaultElevation = if (isFocused) 6.dp else 2.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .width(84.dp)
+                    .height(120.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(ObsidianCardElevated)
+            ) {
+                AsyncImage(
+                    model = item.coverUrl,
+                    contentDescription = item.title,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
                 Surface(
-                    color = Color(0xFF202330),
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.fillMaxWidth()
+                    color = if (item.isSeries) CrimsonPrimary else CyanAccent,
+                    shape = RoundedCornerShape(bottomEnd = 6.dp),
+                    modifier = Modifier.align(Alignment.TopStart)
                 ) {
-                    Column(modifier = Modifier.padding(14.dp)) {
+                    Text(
+                        text = if (item.isSeries) "SÉRIE" else "FILME",
+                        color = if (item.isSeries) Color.White else Color.Black,
+                        fontSize = 8.sp,
+                        fontWeight = FontWeight.Black,
+                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                    )
+                }
+                if (item.completed) {
+                    Surface(
+                        color = EmeraldAdBlock,
+                        shape = RoundedCornerShape(topStart = 6.dp),
+                        modifier = Modifier.align(Alignment.BottomEnd)
+                    ) {
                         Text(
-                            text = "👑 Criador do Aplicativo",
-                            color = Color(0xFFFFD166),
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 13.sp
+                            text = "VISTO ✓",
+                            color = Color.Black,
+                            fontSize = 8.sp,
+                            fontWeight = FontWeight.Black,
+                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
                         )
-                        Spacer(modifier = Modifier.height(4.dp))
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = item.title,
+                        color = TextPrimary,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
+                    )
+                    IconButton(
+                        onClick = onRemove,
+                        modifier = Modifier.size(40.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Remover do histórico",
+                            tint = TextSecondary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+
+                // Stopped marker + watched count
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Surface(
+                        color = CrimsonPrimary.copy(alpha = 0.18f),
+                        shape = RoundedCornerShape(6.dp),
+                        border = BorderStroke(1.dp, CrimsonPrimary.copy(alpha = 0.45f))
+                    ) {
                         Text(
-                            text = "Miguel Rafael Montana",
+                            text = if (item.isSeries) "Temp ${item.season} • Ep ${item.episodeNumber}" else "Filme salvo",
                             color = Color.White,
-                            fontWeight = FontWeight.ExtraBold,
-                            fontSize = 16.sp
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
                         )
-                        Text(
-                            text = "App: A2 Miguel",
-                            color = Color.Gray,
-                            fontSize = 12.sp
-                        )
-                        Spacer(modifier = Modifier.height(10.dp))
-                        Button(
-                            onClick = {
-                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.instagram.com/miguel_rafael_montana_/"))
-                                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                try { context.startActivity(intent) } catch (e: Exception) { e.printStackTrace() }
-                            },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = Color(0xFFE1306C)
-                            ),
-                            shape = RoundedCornerShape(10.dp),
-                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
-                            modifier = Modifier.fillMaxWidth()
+                    }
+                    if (item.isSeries && item.watchedEpisodes.isNotEmpty()) {
+                        Surface(
+                            color = EmeraldAdBlock.copy(alpha = 0.16f),
+                            shape = RoundedCornerShape(6.dp)
                         ) {
                             Text(
-                                text = "📸 Instagram: @miguel_rafael_montana_",
-                                color = Color.White,
+                                text = "${item.watchedEpisodes.size} vistos",
+                                color = EmeraldAdBlock,
+                                fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
-                                fontSize = 12.sp
+                                modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
                             )
                         }
                     }
                 }
 
+                // Action Row
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Button(
+                        onClick = onPlay,
+                        colors = ButtonDefaults.buttonColors(containerColor = CrimsonPrimary),
+                        shape = RoundedCornerShape(8.dp),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                        modifier = Modifier.heightIn(min = 48.dp)
+                    ) {
+                        Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = if (item.isSeries) "Continuar" else "Assistir",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    if (item.isSeries) {
+                        OutlinedButton(
+                            onClick = onDetails,
+                            shape = RoundedCornerShape(8.dp),
+                            border = BorderStroke(1.dp, ObsidianStroke),
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
+                            modifier = Modifier.heightIn(min = 48.dp)
+                        ) {
+                            Text("Temp / Ep", color = TextPrimary, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                        }
+                    }
+
+                    OutlinedButton(
+                        onClick = onRestart,
+                        shape = RoundedCornerShape(8.dp),
+                        border = BorderStroke(1.dp, ObsidianStroke),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
+                        modifier = Modifier.heightIn(min = 48.dp)
+                    ) {
+                        Icon(Icons.Default.Replay, contentDescription = "Reiniciar", tint = AmberGold, modifier = Modifier.size(15.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Reiniciar", color = TextPrimary, fontSize = 11.sp)
+                    }
+
+                    OutlinedButton(
+                        onClick = onToggleCompleted,
+                        shape = RoundedCornerShape(8.dp),
+                        border = BorderStroke(1.dp, if (item.completed) EmeraldAdBlock else ObsidianStroke),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
+                        modifier = Modifier.heightIn(min = 48.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.CheckCircle,
+                            contentDescription = "Marcar como já visto",
+                            tint = if (item.completed) EmeraldAdBlock else TextSecondary,
+                            modifier = Modifier.size(15.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(if (item.completed) "Já Visto" else "Marcar Visto", color = TextPrimary, fontSize = 11.sp)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun DataAndAdBlockDialog(
+    userEmail: String?,
+    userName: String?,
+    history: List<WatchHistoryItem>,
+    adBlockRuleCount: Int,
+    adBlockBlockedSession: Int,
+    adBlockUpdating: Boolean,
+    adBlockAutoUpdate: Boolean,
+    onToggleAdBlockAutoUpdate: (Boolean) -> Unit,
+    onForceUpdateAdBlock: () -> Unit,
+    onSyncCloudNow: () -> Unit,
+    onImportJsonBackup: (String) -> Unit,
+    onSignOut: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+    val clipboard = LocalClipboardManager.current
+    var importJsonInput by remember { mutableStateOf("") }
+    var showImportBox by remember { mutableStateOf(false) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = ObsidianSurface,
+        titleContentColor = TextPrimary,
+        textContentColor = TextSecondary,
+        shape = RoundedCornerShape(22.dp),
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Image(
+                    painter = painterResource(id = R.drawable.ic_a2_logo),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .size(34.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                )
+                Spacer(modifier = Modifier.width(10.dp))
+                Column {
+                    Text("Central A2 Miguel", fontWeight = FontWeight.Black, color = CrimsonPrimary, fontSize = 18.sp)
+                    Text("AdBlock 70+ • Dados Grátis na Nuvem", color = TextSecondary, fontSize = 11.sp)
+                }
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                // 1. AdBlock Section
                 Surface(
-                    color = Color(0xFF202330),
-                    shape = RoundedCornerShape(12.dp),
+                    color = ObsidianCard,
+                    shape = RoundedCornerShape(14.dp),
+                    border = BorderStroke(1.dp, EmeraldAdBlock.copy(alpha = 0.45f)),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Column(modifier = Modifier.padding(14.dp)) {
-                        Text(
-                            text = "🌐 Sites Originais Integrados",
-                            color = Color.LightGray,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 13.sp
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        OutlinedButton(
-                            onClick = {
-                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.pobreflixtv.delivery/"))
-                                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                try { context.startActivity(intent) } catch (e: Exception) { e.printStackTrace() }
-                            },
-                            shape = RoundedCornerShape(10.dp),
+                    Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(
                             modifier = Modifier.fillMaxWidth(),
-                            border = BorderStroke(1.dp, Color(0xFFE50914))
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text("🎬 Pobreflix TV (pobreflixtv.delivery)", color = Color.White, fontSize = 12.sp)
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.Shield, contentDescription = null, tint = EmeraldAdBlock, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("AdBlock 70+ Auto-Atualizável", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            }
+                            Text(
+                                text = "$adBlockRuleCount regras",
+                                color = EmeraldAdBlock,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 11.sp
+                            )
                         }
-                        Spacer(modifier = Modifier.height(6.dp))
-                        OutlinedButton(
-                            onClick = {
-                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://anichan.to/"))
-                                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                try { context.startActivity(intent) } catch (e: Exception) { e.printStackTrace() }
-                            },
-                            shape = RoundedCornerShape(10.dp),
+                        Text(
+                            text = "Bloqueados nesta sessão: $adBlockBlockedSession popups/anúncios.",
+                            color = TextSecondary,
+                            fontSize = 11.sp
+                        )
+                        Row(
                             modifier = Modifier.fillMaxWidth(),
-                            border = BorderStroke(1.dp, Color(0xFF6C5CE7))
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text("⚡ AniChan (anichan.to)", color = Color.White, fontSize = 12.sp)
+                            Text("Atualizar listas automaticamente", color = TextPrimary, fontSize = 12.sp)
+                            Switch(
+                                checked = adBlockAutoUpdate,
+                                onCheckedChange = onToggleAdBlockAutoUpdate,
+                                colors = SwitchDefaults.colors(checkedTrackColor = EmeraldAdBlock)
+                            )
+                        }
+                        Button(
+                            onClick = onForceUpdateAdBlock,
+                            enabled = !adBlockUpdating,
+                            colors = ButtonDefaults.buttonColors(containerColor = EmeraldAdBlock, contentColor = Color.Black),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = 48.dp)
+                                .testTag("force_update_adblock_button")
+                        ) {
+                            if (adBlockUpdating) {
+                                CircularProgressIndicator(color = Color.Black, modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Atualizando listas...", fontWeight = FontWeight.Bold)
+                            } else {
+                                Icon(Icons.Default.Sync, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Atualizar Regras AdBlock Agora", fontWeight = FontWeight.Bold)
+                            }
                         }
                     }
                 }
 
+                // 2. Free Cloud Account & Portable JSON Backup
                 Surface(
-                    color = Color(0xFF1B1D26),
-                    shape = RoundedCornerShape(10.dp),
+                    color = ObsidianCard,
+                    shape = RoundedCornerShape(14.dp),
+                    border = BorderStroke(1.dp, ObsidianStroke),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Column(modifier = Modifier.padding(10.dp)) {
+                    Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("☁️ Salvar Dados de Graça (Celular & PC)", color = AmberGold, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                         Text(
-                            text = "🛡️ Sistema Sem Anúncios (No-Ads)",
-                            color = Color(0xFF06D6A0),
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 12.sp
+                            text = "Conta conectada: ${userName ?: userEmail ?: "Google"}",
+                            color = TextPrimary,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold
                         )
-                        Text(
-                            text = "Bloqueio avançado de popups, redirecionamentos e anúncios invasivos com player embutido.",
-                            color = Color.Gray,
-                            fontSize = 11.sp
-                        )
+                        if (!userEmail.isNullOrBlank()) {
+                            Text(text = userEmail, color = TextSecondary, fontSize = 11.sp)
+                        }
+
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                            Button(
+                                onClick = onSyncCloudNow,
+                                colors = ButtonDefaults.buttonColors(containerColor = CrimsonPrimary),
+                                shape = RoundedCornerShape(10.dp),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .heightIn(min = 48.dp)
+                            ) {
+                                Text("Sincronizar", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            }
+                            OutlinedButton(
+                                onClick = onSignOut,
+                                shape = RoundedCornerShape(10.dp),
+                                border = BorderStroke(1.dp, ObsidianStroke),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .heightIn(min = 48.dp)
+                            ) {
+                                Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = null, tint = TextPrimary, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Sair", color = TextPrimary, fontSize = 12.sp)
+                            }
+                        }
+
+                        HorizontalDivider(color = ObsidianStroke)
+
+                        Text("Transferir entre Celular e PC (JSON grátis):", color = TextSecondary, fontSize = 11.sp)
+
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                            OutlinedButton(
+                                onClick = {
+                                    val json = WatchHistoryManager.exportToJson(context, history)
+                                    clipboard.setText(AnnotatedString(json))
+                                    Toast.makeText(context, "Backup JSON copiado! Cole no PC ou compartilhe.", Toast.LENGTH_LONG).show()
+                                },
+                                shape = RoundedCornerShape(10.dp),
+                                border = BorderStroke(1.dp, CyanAccent.copy(alpha = 0.5f)),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .heightIn(min = 48.dp)
+                            ) {
+                                Text("Exportar JSON", color = CyanAccent, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            }
+                            OutlinedButton(
+                                onClick = { showImportBox = !showImportBox },
+                                shape = RoundedCornerShape(10.dp),
+                                border = BorderStroke(1.dp, AmberGold.copy(alpha = 0.5f)),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .heightIn(min = 48.dp)
+                            ) {
+                                Text("Importar JSON", color = AmberGold, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+
+                        if (showImportBox) {
+                            OutlinedTextField(
+                                value = importJsonInput,
+                                onValueChange = { importJsonInput = it },
+                                label = { Text("Cole aqui o JSON do PC ou backup", fontSize = 11.sp) },
+                                maxLines = 4,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            Button(
+                                onClick = {
+                                    if (importJsonInput.isNotBlank()) {
+                                        onImportJsonBackup(importJsonInput)
+                                        importJsonInput = ""
+                                        showImportBox = false
+                                    }
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = AmberGold, contentColor = Color.Black),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(min = 48.dp)
+                            ) {
+                                Text("Restaurar & Salvar na Nuvem", fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                }
+
+                // 3. Credits (Pobreflix & Creator, no AniChan)
+                Surface(
+                    color = ObsidianCard,
+                    shape = RoundedCornerShape(14.dp),
+                    border = BorderStroke(1.dp, ObsidianStroke),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text("👑 Criado por Miguel Rafael Montana", color = AmberGold, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                            OutlinedButton(
+                                onClick = {
+                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.instagram.com/miguel_rafael_montana_/"))
+                                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                    try { context.startActivity(intent) } catch (_: Exception) {}
+                                },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .heightIn(min = 48.dp),
+                                border = BorderStroke(1.dp, CrimsonPrimary.copy(alpha = 0.6f))
+                            ) {
+                                Text("Instagram", color = TextPrimary, fontSize = 11.sp)
+                            }
+                            OutlinedButton(
+                                onClick = {
+                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.pobreflixtv.delivery/"))
+                                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                    try { context.startActivity(intent) } catch (_: Exception) {}
+                                },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .heightIn(min = 48.dp),
+                                border = BorderStroke(1.dp, ObsidianStroke)
+                            ) {
+                                Text("Pobreflix TV", color = TextPrimary, fontSize = 11.sp)
+                            }
+                        }
                     }
                 }
             }
         },
         confirmButton = {
-            TextButton(
-                onClick = onDismiss,
-                colors = ButtonDefaults.textButtonColors(contentColor = Color(0xFFE50914))
-            ) {
-                Text("Fechar", fontWeight = FontWeight.Bold)
+            TextButton(onClick = onDismiss, modifier = Modifier.heightIn(min = 48.dp)) {
+                Text("Fechar", color = CrimsonPrimary, fontWeight = FontWeight.Bold)
             }
         }
     )

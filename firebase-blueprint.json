@@ -1,0 +1,154 @@
+{
+  "entities": {
+    "WatchHistoryEntry": {
+      "title": "WatchHistoryEntry",
+      "description": "User watch history, watched episodes, favorites, and resume state for movies and series.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Owner Firebase Auth UID."
+        },
+        "title": {
+          "type": "string",
+          "description": "Display title of the movie or series."
+        },
+        "coverUrl": {
+          "type": "string",
+          "description": "Poster image URL."
+        },
+        "itemUrl": {
+          "type": "string",
+          "description": "Canonical movie or series URL."
+        },
+        "currentUrl": {
+          "type": "string",
+          "description": "Current movie or episode playback URL."
+        },
+        "mediaType": {
+          "type": "string",
+          "enum": ["movie", "series"],
+          "description": "Whether the title is a movie or series."
+        },
+        "season": {
+          "type": "integer",
+          "description": "Last watched season number."
+        },
+        "episodeNumber": {
+          "type": "integer",
+          "description": "Last watched episode number."
+        },
+        "episodeTitle": {
+          "type": "string",
+          "description": "Last watched episode title."
+        },
+        "watchedEpisodes": {
+          "type": "array",
+          "description": "Bounded list of watched episode keys like 1x1, 1x2."
+        },
+        "favorite": {
+          "type": "boolean",
+          "description": "Whether the title is saved as favorite."
+        },
+        "completed": {
+          "type": "boolean",
+          "description": "Whether the title is marked as watched."
+        },
+        "progressSeconds": {
+          "type": "integer",
+          "description": "Saved playback position in seconds."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp set via FieldValue.serverTimestamp() on creation."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp set via FieldValue.serverTimestamp() on update."
+        }
+      },
+      "required": [
+        "userId",
+        "title",
+        "itemUrl",
+        "currentUrl",
+        "mediaType",
+        "season",
+        "episodeNumber",
+        "favorite",
+        "completed",
+        "progressSeconds",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "UserPreferences": {
+      "title": "UserPreferences",
+      "description": "Synced player, zoom, focus calibration, AdBlock, and recent search preferences.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Owner Firebase Auth UID."
+        },
+        "zoomPreset": {
+          "type": "string",
+          "enum": ["normal", "fit", "cinema", "full", "custom"],
+          "description": "Active screen zoom preset."
+        },
+        "zoomScale": {
+          "type": "number",
+          "description": "Custom zoom multiplier."
+        },
+        "focusX": {
+          "type": "number",
+          "description": "Calibrated horizontal play ratio."
+        },
+        "focusY": {
+          "type": "number",
+          "description": "Calibrated vertical play ratio."
+        },
+        "adBlockAutoUpdate": {
+          "type": "boolean",
+          "description": "Whether the 60+ AdBlock rule list updates automatically."
+        },
+        "recentSearches": {
+          "type": "array",
+          "description": "Bounded list of recent search queries."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp set via FieldValue.serverTimestamp()."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp set via FieldValue.serverTimestamp()."
+        }
+      },
+      "required": [
+        "userId",
+        "zoomPreset",
+        "zoomScale",
+        "focusX",
+        "focusY",
+        "adBlockAutoUpdate",
+        "createdAt",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}/watch_history/{itemId}": {
+      "schema": { "$ref": "#/entities/WatchHistoryEntry" },
+      "description": "User-scoped watch history, watched episodes, and favorites."
+    },
+    "/users/{userId}/preferences/{prefId}": {
+      "schema": { "$ref": "#/entities/UserPreferences" },
+      "description": "User-scoped player preferences and recent searches."
+    }
+  }
+}

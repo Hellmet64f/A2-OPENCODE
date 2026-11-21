@@ -4,10 +4,10 @@ data class Movie(
     val title: String,
     val coverUrl: String,
     val url: String,
-    val isSeries: Boolean = url.contains("/series/") || url.contains("/anime/"),
-    val isAnime: Boolean = url.contains("anichan.to") || url.startsWith("/anime/"),
+    val isSeries: Boolean = url.contains("/series/") || url.contains("/episodios/"),
     val genre: String = "Geral",
-    val audio: String = "Dub/Leg"
+    val audio: String = "Dub/Leg",
+    val year: String = ""
 )
 
 data class Episode(
@@ -20,23 +20,21 @@ data class Episode(
 
 sealed class AppState {
     object WebLoading : AppState()
-    
+
     data class HomeLoaded(
         val allMovies: List<Movie> = emptyList(),
-        val animeMovies: List<Movie> = emptyList(),
-        val currentTab: String = "Filmes", // "Filmes" (Pobreflix), "Animes" (AniChan), or "MeusTitulos"
+        val currentTab: String = "Inicio", // "Inicio", "Filmes", "Series", "MeusTitulos"
         val searchResults: List<Movie> = emptyList(),
-        val visibleCount: Int = 18,
+        val visibleCount: Int = 24,
         val isSearching: Boolean = false,
         val searchQuery: String = "",
         val isLoadingSearch: Boolean = false,
-        val selectedCategory: String = "Tudo", // "Tudo", "Filmes", "Séries"
-        val selectedAnimeGenre: String = "Todos", // "Todos", "Shonen", "Isekai", "Ação", "Romance", "Fantasia", "Dublados"
-        val selectedAnimeAudio: String = "Todos", // "Todos", "Dublado", "Legendado"
-        val isLoadingAnime: Boolean = false,
-        val watchHistory: List<WatchHistoryItem> = emptyList()
+        val selectedCategory: String = "Tudo", // "Tudo", "Filmes", "Séries", "Favoritos"
+        val watchHistory: List<WatchHistoryItem> = emptyList(),
+        val recentSearches: List<String> = emptyList(),
+        val isRefreshingCatalog: Boolean = false
     ) : AppState()
-    
+
     data class SeriesDetails(
         val series: Movie,
         val previousState: HomeLoaded,
@@ -47,11 +45,15 @@ sealed class AppState {
         val isLoading: Boolean = true,
         val isLoadingSeason: Boolean = false
     ) : AppState()
-    
+
     data class Playing(
         val url: String,
         val title: String = "",
+        val seriesUrl: String = "",
+        val coverUrl: String = "",
         val isSeries: Boolean = false,
+        val season: Int = 1,
+        val availableSeasons: List<Int> = listOf(1),
         val episodes: List<Episode> = emptyList(),
         val currentEpisodeIndex: Int = 0,
         val previousState: AppState? = null

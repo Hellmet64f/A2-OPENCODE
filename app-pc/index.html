@@ -3,126 +3,274 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>A2 Miguel - Filmes, Séries e Animes no PC</title>
+    <title>A2 Miguel — Filmes e Séries no PC</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <!-- Cabeçalho -->
-    <header class="header">
-        <div class="logo-area" onclick="location.reload()">
-            <div class="logo-icon">A2</div>
-            <div class="logo-text">
-                <h1>A2 MIGUEL</h1>
-                <span>Versão Desktop para PC</span>
+    <!-- Barra Lateral / Navegação Desktop -->
+    <div class="app-shell">
+        <aside class="sidebar" id="sidebar">
+            <div class="brand" id="btnBrandHome" title="Voltar ao Início">
+                <div class="brand-badge">A2</div>
+                <div class="brand-info">
+                    <h1>A2 MIGUEL</h1>
+                    <span>Cinema PC &bull; Sem Anúncios</span>
+                </div>
             </div>
-        </div>
 
-        <div class="search-bar">
-            <span class="search-icon">🔍</span>
-            <input type="text" id="searchInput" placeholder="Pesquisar filme, série ou anime..." autocomplete="off">
-        </div>
+            <nav class="nav-menu">
+                <button class="nav-item active" data-view="home">
+                    <span class="nav-icon">🏠</span>
+                    <span>Início</span>
+                </button>
+                <button class="nav-item" data-view="movies">
+                    <span class="nav-icon">🎬</span>
+                    <span>Todos os Filmes</span>
+                </button>
+                <button class="nav-item" data-view="series">
+                    <span class="nav-icon">📺</span>
+                    <span>Todas as Séries</span>
+                </button>
+                <button class="nav-item" data-view="history">
+                    <span class="nav-icon">🕒</span>
+                    <span>Histórico &amp; Já Vistos</span>
+                </button>
+                <button class="nav-item" data-view="favorites">
+                    <span class="nav-icon">❤️</span>
+                    <span>Favoritos</span>
+                </button>
+            </nav>
 
-        <div class="header-actions">
-            <button class="btn-pill" onclick="window.open('https://anichan.to', '_blank')">
-                <span>⛩️</span> AniChan
-            </button>
-            <button class="btn-pill btn-primary" onclick="alert('Pressione a tecla D dentro do reprodutor para abrir a Janela de Download e Edição!')">
-                <span>📥</span> Baixar no PC
-            </button>
-        </div>
-    </header>
+            <div class="sidebar-cards">
+                <div class="status-card adblock-card" id="btnOpenAdBlockModal">
+                    <div class="status-card-header">
+                        <span class="dot-emerald"></span>
+                        <strong>AdBlock 70+ Ativo</strong>
+                    </div>
+                    <p id="sidebarAdblockText">72+ regras • Auto-atualizável</p>
+                    <span class="status-pill" id="sidebarBlockedCount">0 bloqueios nesta sessão</span>
+                </div>
 
-    <!-- Barra de Categorias -->
-    <nav class="categories-bar">
-        <div class="chip active" data-type="all">🔥 Todos os Destaques</div>
-        <div class="chip" data-type="2024">✨ Lançamentos 2024</div>
-        <div class="chip" data-type="movie">🎬 Filmes</div>
-        <div class="chip" data-type="series">📺 Séries</div>
-        <div class="chip" data-type="anime">⛩️ Animes</div>
-    </nav>
+                <div class="status-card backup-card" id="btnOpenDataModal">
+                    <div class="status-card-header">
+                        <span class="dot-gold"></span>
+                        <strong>Dados Gratuitos no PC</strong>
+                    </div>
+                    <p>Salvo em JSON na pasta Downloads</p>
+                    <span class="status-pill-secondary">Exportar / Importar Celular</span>
+                </div>
+            </div>
+        </aside>
 
-    <!-- Banner informativo da pasta de Downloads do PC -->
-    <div class="folder-notice-banner">
-        <div class="folder-notice-text">
-            <span>💻</span>
-            <span>Instalado com sucesso no seu Windows! Seus downloads são organizados na pasta:</span>
-            <span class="folder-path-pill">Downloads\A2-Miguel-PC</span>
+        <!-- Área Principal -->
+        <div class="main-area">
+            <header class="topbar">
+                <form class="search-form" id="searchForm">
+                    <span class="search-icon">🔍</span>
+                    <input
+                        type="text"
+                        id="searchInput"
+                        placeholder="Buscar filmes ou séries em tempo real (Enter para busca completa)..."
+                        autocomplete="off"
+                    >
+                    <button type="button" class="search-clear" id="btnClearSearch" style="display: none;" title="Limpar busca">✕</button>
+                    <button type="submit" class="search-submit">Buscar</button>
+                </form>
+
+                <div class="topbar-actions">
+                    <button class="btn-glass" id="btnRefreshCatalog" title="Atualizar catálogo ao vivo">
+                        <span>🔄</span> Atualizar
+                    </button>
+                    <button class="btn-glass" id="btnOpenFolder" title="Abrir pasta Downloads\A2-Miguel-PC">
+                        <span>📂</span> Pasta Downloads
+                    </button>
+                    <button class="btn-crimson" id="btnOpenDataTop">
+                        <span>💾</span> Backup / Dados
+                    </button>
+                </div>
+            </header>
+
+            <!-- Buscas Recentes + Sugestões Rápidas -->
+            <div class="search-helpers-bar" id="searchHelpersBar">
+                <div class="chips-group" id="recentSearchesRow"></div>
+                <div class="filter-pills">
+                    <button class="filter-pill active" data-type="all">Todos</button>
+                    <button class="filter-pill" data-type="movie">🎬 Filmes</button>
+                    <button class="filter-pill" data-type="series">📺 Séries</button>
+                </div>
+            </div>
+
+            <main class="content-scroll" id="mainScroll">
+                <!-- Banner Hero -->
+                <section class="hero-banner" id="heroBanner" style="display: none;">
+                    <div class="hero-backdrop" id="heroBackdrop"></div>
+                    <div class="hero-gradient"></div>
+                    <div class="hero-content">
+                        <div class="hero-badges">
+                            <span class="badge-crimson">★ DESTAQUE EM ALTA</span>
+                            <span class="badge-emerald">🛡️ SEM ANÚNCIOS</span>
+                            <span class="badge-gold" id="heroTypeBadge">FILME</span>
+                        </div>
+                        <h2 id="heroTitle">Carregando catálogo...</h2>
+                        <p id="heroSubtitle">Catálogo ao vivo com múltiplos servidores dublados e legendados.</p>
+                        <div class="hero-buttons">
+                            <button class="btn-crimson btn-hero" id="btnHeroPlay">▶ Assistir Agora</button>
+                            <button class="btn-glass btn-hero" id="btnHeroFavorite">♡ Favoritar</button>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Seção Continuar Assistindo -->
+                <section class="row-section" id="continueSection" style="display: none;">
+                    <div class="section-header">
+                        <h3>🕒 Continuar Assistindo</h3>
+                        <button class="link-btn" id="btnViewAllHistory">Ver Histórico Completo →</button>
+                    </div>
+                    <div class="horizontal-row" id="continueRow"></div>
+                </section>
+
+                <!-- Grade Principal do Catálogo / Busca / Histórico -->
+                <section class="grid-section">
+                    <div class="section-header">
+                        <div class="section-title-group">
+                            <h3 id="gridSectionTitle">🎬 Catálogo Completo</h3>
+                            <span class="count-badge" id="totalTitlesCount">Carregando...</span>
+                        </div>
+                        <div class="section-tools">
+                            <button class="btn-glass small" id="btnClearHistory" style="display: none;">🗑️ Limpar Histórico</button>
+                        </div>
+                    </div>
+
+                    <div id="catalogStatusBanner" class="status-banner" style="display: none;"></div>
+                    <div class="media-grid" id="mediaGrid"></div>
+
+                    <div class="pagination-bar" id="paginationBar" style="display: none;">
+                        <button class="btn-glass" id="btnLoadMore">Carregar Mais Títulos (+)</button>
+                    </div>
+                </section>
+            </main>
         </div>
-        <button class="btn-pill" style="font-size: 11px; padding: 4px 10px;" onclick="alert('Seus downloads e arquivos do programa ficam salvos em: ' + (navigator.userAgent.includes('Windows') ? '%USERPROFILE%\\Downloads\\A2-Miguel-PC' : 'Downloads/A2-Miguel-PC'))">
-            Ver Pasta
-        </button>
     </div>
 
-    <!-- Catálogo de Títulos -->
-    <main class="content-section">
-        <div class="section-title">
-            <span>🎬</span> Catálogo Disponível (<span id="totalTitlesCount">Carregando...</span>)
+    <!-- Modal Detalhes da Série / Filme -->
+    <div class="modal-overlay" id="detailsModal" style="display: none;">
+        <div class="details-window">
+            <button class="modal-close-btn" id="btnCloseDetails" title="Fechar (Esc)">✕</button>
+            <div class="details-hero">
+                <img id="detailsPoster" src="" alt="Capa" class="details-poster">
+                <div class="details-meta">
+                    <div class="details-badges">
+                        <span class="badge-crimson" id="detailsTypeBadge">SÉRIE</span>
+                        <span class="badge-gold" id="detailsYearBadge">2025</span>
+                        <span class="badge-emerald" id="detailsWatchedBadge" style="display: none;">✓ JÁ VISTO</span>
+                    </div>
+                    <h2 id="detailsTitle">Título</h2>
+                    <p id="detailsDesc">Carregando episódios e servidores disponíveis...</p>
+
+                    <div class="details-actions">
+                        <button class="btn-crimson" id="btnDetailsContinue">▶ Assistir / Continuar</button>
+                        <button class="btn-glass" id="btnDetailsRestart" style="display: none;">↺ Reiniciar (T1 E1)</button>
+                        <button class="btn-glass" id="btnDetailsFavorite">♡ Favoritar</button>
+                        <button class="btn-glass" id="btnDetailsCompleted">✓ Marcar Já Visto</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="details-series-controls" id="detailsSeriesControls" style="display: none;">
+                <div class="controls-bar">
+                    <div class="season-tabs" id="detailsSeasonTabs"></div>
+                    <div class="audio-toggle">
+                        <button class="audio-btn active" data-audio="Dublado" id="btnAudioDub">🇧🇷 Dublado</button>
+                        <button class="audio-btn" data-audio="Legendado" id="btnAudioLeg">📝 Legendado</button>
+                    </div>
+                </div>
+                <div class="episodes-grid" id="detailsEpisodesList"></div>
+            </div>
         </div>
-        <div class="media-grid" id="mediaGrid">
-            <!-- Cards gerados via app.js -->
-        </div>
-    </main>
+    </div>
 
     <!-- Modal do Reprodutor de Vídeo -->
     <div class="player-modal" id="playerModal" style="display: none;">
         <div class="player-header">
             <div class="player-title-info">
-                <h2 id="playerTitle">Reproduzindo Vídeo</h2>
-                <span id="playerMeta">A2 Miguel Cinema</span>
+                <div class="player-title-row">
+                    <h2 id="playerTitle">Reproduzindo Vídeo</h2>
+                    <span class="badge-emerald small" id="playerAdblockPill">🛡️ AdBlock 70+</span>
+                </div>
+                <span id="playerMeta">A2 Miguel • Modo Sem Anúncios</span>
             </div>
 
             <div class="server-selector-bar" id="serverSelectorBar">
-                <span class="server-label">Servidor:</span>
-                <button class="server-btn active" data-server="1" id="btnServer1">★ Servidor 1 (Dublado)</button>
-                <button class="server-btn" data-server="2" id="btnServer2">🚀 Servidor 2 (HD)</button>
-                <button class="server-btn" data-server="3" id="btnServer3">🛡️ Servidor 3 (Reserva)</button>
+                <span class="server-label">Servidores:</span>
+                <div class="server-buttons-list" id="serverButtonsList"></div>
             </div>
 
             <div class="player-controls-row">
-                <button class="btn-pill" id="btnPlayerZoom" title="Alternar Zoom da Tela (Tecla Z)">
-                    <span>🔍</span> Zoom Tela
-                </button>
-                <button class="btn-pill btn-primary" id="btnPlayerDownload" title="Abrir Janela de Download (Tecla D)">
-                    <span>📥</span> Baixar Vídeo (D)
-                </button>
-                <button class="btn-pill" id="btnClosePlayer" style="background: #33384c;">
-                    <span>✕</span> Fechar
-                </button>
+                <button class="btn-glass small" id="btnPrevEpisode" style="display: none;" title="Episódio Anterior">⏮ Anterior</button>
+                <button class="btn-glass small" id="btnRestartVideo" title="Reiniciar do começo">↺ Reiniciar</button>
+                <button class="btn-glass small" id="btnNextEpisode" style="display: none;" title="Próximo Episódio">Próximo ⏭</button>
+                <button class="btn-glass small" id="btnToggleEpisodesDrawer" style="display: none;" title="Trocar Temporada / Episódios">📺 Temporadas</button>
+                <button class="btn-glass small" id="btnPlayerZoom" title="Alternar Zoom da Tela (Tecla Z)">🔍 Zoom (100%)</button>
+                <button class="btn-glass small" id="btnPlayerMarkWatched" title="Marcar como Já Visto">✓ Já Visto</button>
+                <button class="btn-crimson small" id="btnPlayerDownload" title="Abrir Janela de Download e Edição (Tecla D)">📥 Baixar (D)</button>
+                <button class="btn-glass small" id="btnClosePlayer" title="Fechar Player (Esc)">✕ Fechar</button>
             </div>
         </div>
 
-        <div class="video-container">
-            <div class="video-frame-wrapper" id="videoFrameWrapper">
-                <iframe id="playerFrame" src="about:blank" allowfullscreen allow="autoplay; encrypted-media"></iframe>
+        <div class="video-workspace">
+            <div class="video-container">
+                <div class="video-frame-wrapper" id="videoFrameWrapper">
+                    <iframe
+                        id="playerFrame"
+                        src="about:blank"
+                        allowfullscreen
+                        allow="autoplay; encrypted-media; picture-in-picture"
+                    ></iframe>
+                </div>
+                <div class="player-loading-overlay" id="playerLoadingOverlay" style="display: none;">
+                    <div class="spinner"></div>
+                    <p id="playerLoadingText">Conectando aos servidores dublados sem anúncios...</p>
+                </div>
             </div>
+
+            <!-- Drawer Lateral de Temporadas & Episódios dentro do Player -->
+            <aside class="episodes-drawer" id="episodesDrawer" style="display: none;">
+                <div class="drawer-header">
+                    <div>
+                        <h4>📺 Temporadas &amp; Episódios</h4>
+                        <span id="drawerSeriesName">Série</span>
+                    </div>
+                    <button class="modal-close-btn small" id="btnCloseDrawer">✕</button>
+                </div>
+                <div class="drawer-seasons" id="drawerSeasonsList"></div>
+                <div class="drawer-episodes" id="drawerEpisodesList"></div>
+            </aside>
         </div>
     </div>
 
-    <!-- Janela Dedicada de Download & Edição -->
-    <div class="download-dialog-overlay" id="downloadOverlay" style="display: none;">
-        <div class="download-window">
+    <!-- Janela de Download & Edição -->
+    <div class="modal-overlay" id="downloadOverlay" style="display: none;">
+        <div class="dialog-window">
             <div class="window-titlebar">
                 <div class="titlebar-left">
-                    <span style="font-size: 18px;">📥</span>
-                    <span class="titlebar-title">A2 Miguel • Janela de Download e Edição no PC</span>
+                    <span>📥</span>
+                    <span class="titlebar-title">Download &amp; Edição no PC</span>
                 </div>
-                <button class="titlebar-close" id="btnCloseDownload">✕</button>
+                <button class="modal-close-btn small" id="btnCloseDownload">✕</button>
             </div>
 
             <div class="window-body">
-                <!-- Nome do arquivo editável -->
                 <div class="form-group">
                     <label class="form-label">
                         <span>📝 Nome do Arquivo (Editável)</span>
-                        <span style="color: #64b5f6; font-size: 11px; cursor: pointer;" onclick="document.getElementById('inputDownloadName').value = 'A2_Video_' + Date.now() + '.mp4'">Gerar Automático</span>
+                        <span class="link-btn" id="btnAutoNameDownload">Gerar Automático</span>
                     </label>
-                    <input type="text" class="form-input" id="inputDownloadName" value="A2_Miguel_Video_1080p.mp4">
-                    <span style="font-size: 11px; color: #7f869e;">O arquivo será salvo com a extensão .mp4 na sua pasta Downloads do PC.</span>
+                    <input type="text" class="form-input" id="inputDownloadName" value="A2_Miguel_Video.mp4">
+                    <span class="form-hint">Salva organizado em Downloads\A2-Miguel-PC\Videos.</span>
                 </div>
 
-                <!-- Seleção de Qualidade -->
                 <div class="form-group">
-                    <label class="form-label">🎬 Qualidade do Vídeo</label>
+                    <label class="form-label">🎬 Qualidade Preferida</label>
                     <div class="options-row">
                         <div class="option-box quality-box selected" data-quality="1080p">
                             <div class="option-title">1080p Full HD</div>
@@ -130,7 +278,7 @@
                         </div>
                         <div class="option-box quality-box" data-quality="720p">
                             <div class="option-title">720p HD</div>
-                            <div class="option-desc">Ideal e equilibrado</div>
+                            <div class="option-desc">Equilibrado</div>
                         </div>
                         <div class="option-box quality-box" data-quality="480p">
                             <div class="option-title">480p Rápido</div>
@@ -143,33 +291,71 @@
                     </div>
                 </div>
 
-                <!-- Seleção da Pasta no PC -->
                 <div class="form-group">
-                    <label class="form-label">📂 Pasta de Destino no Computador</label>
+                    <label class="form-label">📂 Pasta de Destino</label>
                     <div class="options-row">
                         <div class="option-box folder-box selected-blue" data-folder="videos">
-                            <div class="option-title">📂 Downloads\Videos</div>
+                            <div class="option-title">📂 Videos</div>
                             <div class="option-desc">Pasta padrão</div>
                         </div>
                         <div class="option-box folder-box" data-folder="filmes">
-                            <div class="option-title">🎬 Downloads\Filmes</div>
-                            <div class="option-desc">Para longas-metragens</div>
+                            <div class="option-title">🎬 Filmes</div>
+                            <div class="option-desc">Longas-metragens</div>
                         </div>
                         <div class="option-box folder-box" data-folder="series">
-                            <div class="option-title">📺 Downloads\Series</div>
-                            <div class="option-desc">Para episódios</div>
+                            <div class="option-title">📺 Series</div>
+                            <div class="option-desc">Episódios</div>
                         </div>
                     </div>
                 </div>
             </div>
 
             <div class="window-footer">
-                <button class="btn-large btn-download-action" id="btnStartDownloadAction">
-                    <span>⬇️</span> BAIXAR VÍDEO AGORA
-                </button>
-                <button class="btn-large btn-secondary" id="btnCancelDownloadAction">
-                    Cancelar
-                </button>
+                <button class="btn-crimson btn-large" id="btnStartDownloadAction">⬇️ Salvar / Baixar Agora</button>
+                <button class="btn-glass btn-large" id="btnCancelDownloadAction">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Dados Gratuitos & AdBlock 70+ -->
+    <div class="modal-overlay" id="dataModal" style="display: none;">
+        <div class="dialog-window">
+            <div class="window-titlebar">
+                <div class="titlebar-left">
+                    <span>💾</span>
+                    <span class="titlebar-title">Dados Gratuitos, AdBlock 70+ &amp; Backup Celular</span>
+                </div>
+                <button class="modal-close-btn small" id="btnCloseDataModal">✕</button>
+            </div>
+
+            <div class="window-body">
+                <div class="info-card">
+                    <div class="info-card-row">
+                        <div>
+                            <h4>🛡️ Motor AdBlock 70+ Auto-Atualizável</h4>
+                            <p id="modalAdblockStatus">72+ regras ativas • Bloqueia anúncios, popups e apostas</p>
+                        </div>
+                        <button class="btn-emerald small" id="btnUpdateAdblockNow">🔄 Atualizar Regras Agora</button>
+                    </div>
+                </div>
+
+                <div class="info-card">
+                    <h4>💾 Salvamento Gratuito Automático</h4>
+                    <p>Todo o seu histórico, episódios já vistos, favoritos, buscas recentes e zoom são salvos gratuitamente no seu computador em:</p>
+                    <code class="path-code" id="modalDataPath">Downloads\A2-Miguel-PC\dados\a2_dados.json</code>
+                </div>
+
+                <div class="info-card">
+                    <h4>📲 Transferir Dados entre Celular e PC (100% Compatível)</h4>
+                    <p>Exporte um arquivo JSON para guardar ou importar o mesmo histórico do aplicativo Android A2 Miguel.</p>
+                    <div class="modal-action-pair">
+                        <button class="btn-crimson" id="btnExportJson">📤 Exportar Backup (.json)</button>
+                        <label class="btn-glass file-upload-label">
+                            📥 Importar Backup (.json)
+                            <input type="file" id="inputImportJson" accept=".json,application/json" style="display: none;">
+                        </label>
+                    </div>
+                </div>
             </div>
         </div>
     </div>

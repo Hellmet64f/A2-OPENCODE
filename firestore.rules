@@ -1,0 +1,126 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidWatchHistoryEntry(data, userId) {
+      return data.userId is string &&
+             data.userId == userId &&
+             data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             data.title is string && data.title.size() >= 1 && data.title.size() <= 200 &&
+             (!('coverUrl' in data) || (data.coverUrl is string && data.coverUrl.size() <= 1000)) &&
+             data.itemUrl is string && data.itemUrl.size() >= 1 && data.itemUrl.size() <= 1000 &&
+             data.currentUrl is string && data.currentUrl.size() >= 1 && data.currentUrl.size() <= 1000 &&
+             data.mediaType is string && data.mediaType in ['movie', 'series'] &&
+             data.season is int && data.season >= 1 && data.season <= 200 &&
+             data.episodeNumber is int && data.episodeNumber >= 1 && data.episodeNumber <= 5000 &&
+             (!('episodeTitle' in data) || (data.episodeTitle is string && data.episodeTitle.size() <= 200)) &&
+             (!('watchedEpisodes' in data) || (
+               data.watchedEpisodes is list &&
+               data.watchedEpisodes.size() <= 300 &&
+               (data.watchedEpisodes.size() == 0 || data.watchedEpisodes[0] is string)
+             )) &&
+             data.favorite is bool &&
+             data.completed is bool &&
+             data.progressSeconds is int && data.progressSeconds >= 0 && data.progressSeconds <= 86400 &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidUserPreferences(data, userId) {
+      return data.userId is string &&
+             data.userId == userId &&
+             data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             data.zoomPreset is string &&
+             data.zoomPreset in ['normal', 'fit', 'cinema', 'full', 'custom'] &&
+             data.zoomScale is number && data.zoomScale >= 1.0 && data.zoomScale <= 2.5 &&
+             data.focusX is number && data.focusX >= 0.05 && data.focusX <= 0.95 &&
+             data.focusY is number && data.focusY >= 0.05 && data.focusY <= 0.95 &&
+             data.adBlockAutoUpdate is bool &&
+             (!('recentSearches' in data) || (
+               data.recentSearches is list &&
+               data.recentSearches.size() <= 20 &&
+               (data.recentSearches.size() == 0 || data.recentSearches[0] is string)
+             )) &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    match /users/{userId}/watch_history/{itemId} {
+      allow get: if isOwner(userId) && isValidId(itemId);
+      allow list: if isOwner(userId);
+      allow create: if isOwner(userId) &&
+                       isValidId(itemId) &&
+                       incoming().keys().hasAll([
+                         'userId', 'title', 'itemUrl', 'currentUrl', 'mediaType',
+                         'season', 'episodeNumber', 'favorite', 'completed',
+                         'progressSeconds', 'createdAt', 'updatedAt'
+                       ]) &&
+                       incoming().keys().hasOnly([
+                         'userId', 'title', 'coverUrl', 'itemUrl', 'currentUrl', 'mediaType',
+                         'season', 'episodeNumber', 'episodeTitle', 'watchedEpisodes',
+                         'favorite', 'completed', 'progressSeconds', 'createdAt', 'updatedAt'
+                       ]) &&
+                       isValidWatchHistoryEntry(incoming(), userId);
+      allow update: if isOwner(userId) &&
+                       isValidId(itemId) &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().diff(existing()).affectedKeys().hasOnly([
+                         'title', 'coverUrl', 'itemUrl', 'currentUrl', 'mediaType',
+                         'season', 'episodeNumber', 'episodeTitle', 'watchedEpisodes',
+                         'favorite', 'completed', 'progressSeconds', 'updatedAt'
+                       ]) &&
+                       isValidWatchHistoryEntry(incoming(), userId);
+      allow delete: if isOwner(userId) && isValidId(itemId);
+    }
+
+    match /users/{userId}/preferences/{prefId} {
+      allow get: if isOwner(userId) && isValidId(prefId);
+      allow list: if isOwner(userId);
+      allow create: if isOwner(userId) &&
+                       isValidId(prefId) &&
+                       incoming().keys().hasAll([
+                         'userId', 'zoomPreset', 'zoomScale', 'focusX', 'focusY',
+                         'adBlockAutoUpdate', 'createdAt', 'updatedAt'
+                       ]) &&
+                       incoming().keys().hasOnly([
+                         'userId', 'zoomPreset', 'zoomScale', 'focusX', 'focusY',
+                         'adBlockAutoUpdate', 'recentSearches', 'createdAt', 'updatedAt'
+                       ]) &&
+                       isValidUserPreferences(incoming(), userId);
+      allow update: if isOwner(userId) &&
+                       isValidId(prefId) &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().diff(existing()).affectedKeys().hasOnly([
+                         'zoomPreset', 'zoomScale', 'focusX', 'focusY',
+                         'adBlockAutoUpdate', 'recentSearches', 'updatedAt'
+                       ]) &&
+                       isValidUserPreferences(incoming(), userId);
+      allow delete: if isOwner(userId) && isValidId(prefId);
+    }
+  }
+}
